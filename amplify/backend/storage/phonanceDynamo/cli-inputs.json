@@ -1,0 +1,12 @@
+{
+  "resourceName": "phonanceDynamo",
+  "tableName": "phonanceDynamo",
+  "partitionKey": {
+    "fieldName": "username",
+    "fieldType": "string"
+  },
+  "gsi": [],
+  "triggerFunctions": [
+    "phonance5b895057"
+  ]
+}

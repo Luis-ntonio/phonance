@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "storage": {
+      "phonanceDynamo": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ]
+    }
+  },
+  "lambdaLayers": [],
+  "environmentVariableList": [
+    {
+      "cloudFormationParameterName": "mpAccessToken",
+      "environmentVariableName": "MP_ACCESS_TOKEN"
+    }
+  ]
+}

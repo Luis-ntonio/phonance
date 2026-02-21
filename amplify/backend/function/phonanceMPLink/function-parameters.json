@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "storage": {
+      "phonanceDynamo": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ]
+    }
+  },
+  "lambdaLayers": [],
+  "environmentVariableList": [
+    {
+      "cloudFormationParameterName": "mpAccessToken",
+      "environmentVariableName": "MP_ACCESS_TOKEN"
+    },
+    {
+      "cloudFormationParameterName": "mpWebhookUrl",
+      "environmentVariableName": "MP_WEBHOOK_URL"
+    },
+    {
+      "cloudFormationParameterName": "successUrl",
+      "environmentVariableName": "SUCCESS_URL"
+    }
+  ]
+}

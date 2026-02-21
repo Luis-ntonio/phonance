@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "storage": {
+      "phonanceDynamo": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ]
+    }
+  },
+  "lambdaLayers": [],
+  "environmentVariableList": [
+    {
+      "cloudFormationParameterName": "mpAccessToken",
+      "environmentVariableName": "MP_ACCESS_TOKEN"
+    },
+    {
+      "cloudFormationParameterName": "mpWebhookSecret",
+      "environmentVariableName": "MP_WEBHOOK_SECRET"
+    },
+    {
+      "cloudFormationParameterName": "mpWebhookTestSecret",
+      "environmentVariableName": "MP_WEBHOOK_TEST_SECRET"
+    }
+  ]
+}

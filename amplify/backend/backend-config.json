@@ -1,0 +1,365 @@
+{
+  "api": {
+    "phonanceApi": {
+      "dependsOn": [
+        {
+          "attributes": [
+            "Name",
+            "Arn"
+          ],
+          "category": "function",
+          "resourceName": "phonance5b895057"
+        },
+        {
+          "attributes": [
+            "Name",
+            "Arn"
+          ],
+          "category": "function",
+          "resourceName": "phonancesubscription"
+        },
+        {
+          "attributes": [
+            "Name",
+            "Arn"
+          ],
+          "category": "function",
+          "resourceName": "phonanceSubscriptions"
+        },
+        {
+          "attributes": [
+            "Name",
+            "Arn"
+          ],
+          "category": "function",
+          "resourceName": "phonanceMPLink"
+        },
+        {
+          "attributes": [
+            "Name",
+            "Arn"
+          ],
+          "category": "function",
+          "resourceName": "phonanceCheckSubscription"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "API Gateway"
+    }
+  },
+  "auth": {
+    "phonanceabd269a5": {
+      "customAuth": false,
+      "dependsOn": [
+        {
+          "attributes": [
+            "Arn",
+            "Name"
+          ],
+          "category": "function",
+          "resourceName": "phonanceabd269a5PreSignup",
+          "triggerProvider": "Cognito"
+        }
+      ],
+      "frontendAuthConfig": {
+        "mfaConfiguration": "OFF",
+        "mfaTypes": [
+          "SMS"
+        ],
+        "passwordProtectionSettings": {
+          "passwordPolicyCharacters": [],
+          "passwordPolicyMinLength": 8
+        },
+        "signupAttributes": [
+          "EMAIL"
+        ],
+        "socialProviders": [],
+        "usernameAttributes": [
+          "EMAIL",
+          "PHONE_NUMBER"
+        ],
+        "verificationMechanisms": [
+          "EMAIL"
+        ]
+      },
+      "providerPlugin": "awscloudformation",
+      "service": "Cognito"
+    }
+  },
+  "function": {
+    "phonance5b895057": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "Name",
+            "Arn",
+            "StreamArn"
+          ],
+          "category": "storage",
+          "resourceName": "phonanceDynamo"
+        },
+        {
+          "attributes": [
+            "Name",
+            "Arn",
+            "StreamArn"
+          ],
+          "category": "storage",
+          "resourceName": "phonanceExpenses"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "phonanceCheckSubscription": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "Name",
+            "Arn",
+            "StreamArn"
+          ],
+          "category": "storage",
+          "resourceName": "phonanceDynamo"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "phonanceMPLink": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "Name",
+            "Arn",
+            "StreamArn"
+          ],
+          "category": "storage",
+          "resourceName": "phonanceDynamo"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "phonanceSubscriptions": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "Name",
+            "Arn",
+            "StreamArn"
+          ],
+          "category": "storage",
+          "resourceName": "phonanceDynamo"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "phonanceabd269a5PreSignup": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "phonancesubscription": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "Name",
+            "Arn",
+            "StreamArn"
+          ],
+          "category": "storage",
+          "resourceName": "phonanceDynamo"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    }
+  },
+  "parameters": {
+    "AMPLIFY_function_phonance5b895057_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonance5b895057"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonance5b895057_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonance5b895057"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonance5b895057_tableName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonance5b895057"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceCheckSubscription_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceCheckSubscription"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceCheckSubscription_mpAccessToken": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceCheckSubscription"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceCheckSubscription_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceCheckSubscription"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceMPLink_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceMPLink"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceMPLink_mpAccessToken": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceMPLink"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceMPLink_mpWebhookUrl": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceMPLink"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceMPLink_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceMPLink"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceMPLink_successUrl": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceMPLink"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceSubscriptions_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceSubscriptions"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceSubscriptions_mpAccessToken": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceSubscriptions"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceSubscriptions_mpWebhookSecret": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceSubscriptions"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceSubscriptions_mpWebhookTestSecret": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceSubscriptions"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceSubscriptions_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceSubscriptions"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceabd269a5PreSignup_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceabd269a5PreSignup"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonanceabd269a5PreSignup_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonanceabd269a5PreSignup"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonancesubscription_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonancesubscription"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonancesubscription_mpAccessToken": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonancesubscription"
+        }
+      ]
+    },
+    "AMPLIFY_function_phonancesubscription_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "phonancesubscription"
+        }
+      ]
+    }
+  },
+  "storage": {
+    "phonanceDynamo": {
+      "providerPlugin": "awscloudformation",
+      "service": "DynamoDB"
+    },
+    "phonanceExpenses": {
+      "providerPlugin": "awscloudformation",
+      "service": "DynamoDB"
+    }
+  }
+}

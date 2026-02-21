@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "paths": {
+    "/profile": {
+      "name": "/profile",
+      "lambdaFunction": "phonance5b895057",
+      "permissions": {
+        "setting": "private",
+        "auth": [
+          "create",
+          "read",
+          "update"
+        ]
+      }
+    },
+    "/expenses": {
+      "name": "/expenses",
+      "lambdaFunction": "phonance5b895057",
+      "permissions": {
+        "setting": "private",
+        "auth": [
+          "create",
+          "read",
+          "update"
+        ]
+      }
+    },
+    "/subscription": {
+      "name": "/subscription",
+      "lambdaFunction": "phonancesubscription",
+      "permissions": {
+        "setting": "private",
+        "auth": [
+          "create",
+          "read",
+          "update",
+          "delete"
+        ]
+      }
+    },
+    "/webhook": {
+      "name": "/webhook",
+      "lambdaFunction": "phonanceSubscriptions",
+      "permissions": {
+        "setting": "open"
+      }
+    },
+    "/getMPlink": {
+      "name": "/getMPlink",
+      "lambdaFunction": "phonanceMPLink",
+      "permissions": {
+        "setting": "private",
+        "auth": [
+          "create",
+          "read",
+          "update"
+        ]
+      }
+    },
+    "/subscription/refresh": {
+      "name": "/subscription/refresh",
+      "lambdaFunction": "phonanceCheckSubscription",
+      "permissions": {
+        "setting": "private",
+        "auth": [
+          "create",
+          "read",
+          "update",
+          "delete"
+        ]
+      }
+    },
+    "/subscription/summary": {
+      "name": "/subscription/summary",
+      "lambdaFunction": "phonancesubscription",
+      "permissions": {
+        "setting": "private",
+        "auth": [
+          "create",
+          "read",
+          "update",
+          "delete"
+        ]
+      }
+    },
+    "/subscription/cancel": {
+      "name": "/subscription/cancel",
+      "lambdaFunction": "phonancesubscription",
+      "permissions": {
+        "setting": "private",
+        "auth": [
+          "create",
+          "read",
+          "update",
+          "delete"
+        ]
+      }
+    }
+  }
+}
