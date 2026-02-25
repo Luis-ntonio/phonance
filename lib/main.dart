@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:phonance/charts_utils.dart';
@@ -14,6 +16,7 @@ import './settings/settings_tab.dart';
 
 
 import './auth/auth_gate.dart';
+import './subscription/subscription_gate.dart';
 import 'amplify_initializer.dart';
 import './apiExpenses/expenses_api.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
@@ -45,24 +48,115 @@ void main() async {
   runApp(MyApp(db: db));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final ExpensesDb db;
   const MyApp({super.key, required this.db});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _isDarkMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDarkModePreference();
+  }
+
+  Future<void> _loadDarkModePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isDarkMode = prefs.getBool('isDarkMode') ?? false;
+    });
+  }
+
+  void _toggleDarkMode() async {
+    setState(() {
+      _isDarkMode = !_isDarkMode;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', _isDarkMode);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Phonance',
-      theme: ThemeData(useMaterial3: true),
-      home: AuthGate(db: db),
+      theme: _buildLightTheme(),
+      darkTheme: _buildDarkTheme(),
+      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      home: SubscriptionGate(
+        db: widget.db,
+        onDarkModeToggle: _toggleDarkMode,
+        isDarkMode: _isDarkMode,
+      ),
     );
   }
-}
+
+  ThemeData _buildLightTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      textTheme: GoogleFonts.poppinsTextTheme(),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF80DEEA),
+        foregroundColor: Color(0xFF00695C),
+        elevation: 0,
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFF80DEEA),
+        selectedItemColor: Color(0xFF00695C),
+        unselectedItemColor: Color(0xFF004D40),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF4DD0E1),
+          foregroundColor: const Color(0xFF00695C),
+        ),
+      ),
+    );
+  }
+
+  ThemeData _buildDarkTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      textTheme: GoogleFonts.poppinsTextTheme(
+        ThemeData(brightness: Brightness.dark).textTheme,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF1A2332),
+        foregroundColor: Color(0xFF80DEEA),
+        elevation: 0,
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFF1A2332),
+        selectedItemColor: Color(0xFF80DEEA),
+        unselectedItemColor: Color(0xFF4DD0E1),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF4DD0E1),
+          foregroundColor: const Color(0xFF1A2332),
+        ),
+      ),
+    );
+  }
 
 
 class HomePage extends StatefulWidget {
   final ExpensesDb db;
-  const HomePage({super.key, required this.db});
+  final VoidCallback onDarkModeToggle;
+  final bool isDarkMode;
+
+  const HomePage({
+    super.key,
+    required this.db,
+    required this.onDarkModeToggle,
+    required this.isDarkMode,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -79,7 +173,7 @@ class _HomePageState extends State<HomePage> {
   bool _hasAccess = false;
   bool _gmailConnected = false;
   List<Expense> _items = [];
-  int _selectedIndex = 0;  // Controlador de pestañas
+  int _selectedIndex = 0;  // Controlador de pestañas (0=Gráficos, 1=Gastos, 2=Configuración)
 
   @override
   void initState() {
@@ -387,6 +481,63 @@ class _HomePageState extends State<HomePage> {
     await _loadItems();
   }
 
+  void _showEditCategoryDialog(Expense expense, BuildContext context) {
+    final categories = ['Comida', 'Supermercado', 'Transporte', 'Entretenimiento', 'Salud', 'Servicios', 'Transferencias', 'Otros'];
+    String selectedCategory = expense.category ?? 'Otros';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar Categoría'),
+        content: DropdownButtonFormField<String>(
+          value: selectedCategory,
+          items: categories.map((cat) {
+            return DropdownMenuItem(value: cat, child: Text(cat));
+          }).toList(),
+          onChanged: (newValue) {
+            if (newValue != null) {
+              selectedCategory = newValue;
+            }
+          },
+          decoration: const InputDecoration(labelText: 'Categoría'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Actualizar la categoría en la BD local
+              await widget.db.db.update(
+                'expenses',
+                {'category': selectedCategory},
+                where: 'dedupeKey = ?',
+                whereArgs: [expense.dedupeKey],
+              );
+              
+              // Sincronizar con DynamoDB
+              try {
+                await ExpensesApi.updateExpenseCategory(
+                  expense.dedupeKey,
+                  expense.timestampMs,
+                  selectedCategory,
+                );
+              } catch (e) {
+                debugPrint('Error actualizando categoría en cloud: $e');
+              }
+              
+              // Recargar items
+              await _loadItems();
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _sub?.cancel();
@@ -401,6 +552,19 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Phonance'),
         actions: [
+          IconButton(
+            tooltip: 'Modo oscuro',
+            onPressed: widget.onDarkModeToggle,
+            icon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) {
+                return ScaleTransition(scale: animation, child: child);
+              },
+              child: widget.isDarkMode
+                  ? const Icon(Icons.nights_stay, key: ValueKey(1))
+                  : const Icon(Icons.wb_sunny, key: ValueKey(0)),
+            ),
+          ),
           IconButton(
             tooltip: 'Refrescar estado',
             onPressed: _refreshAccess,
@@ -425,11 +589,13 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: _selectedIndex == 0
-          ? _buildExpenseList(df)
-          : _selectedIndex == 1
+      body: _AnimatedGradientBg(
+        child: _selectedIndex == 0
             ? _buildCategoryChart()
-            : SettingsTab(db: widget.db),
+            : _selectedIndex == 1
+              ? _buildExpenseList(df)
+              : SettingsTab(db: widget.db),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -437,20 +603,41 @@ class _HomePageState extends State<HomePage> {
             _selectedIndex = index;
           });
         },
-        items: const [
+        type: BottomNavigationBarType.fixed,
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.list),
-            label: 'Gastos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
+            icon: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _selectedIndex == 0 ? const Color(0xFF4DD0E1).withOpacity(0.3) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.bar_chart),
+            ),
             label: 'Gráficos',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
+            icon: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _selectedIndex == 1 ? const Color(0xFF4DD0E1).withOpacity(0.3) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.list),
+            ),
+            label: 'Gastos',
+          ),
+          BottomNavigationBarItem(
+            icon: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _selectedIndex == 2 ? const Color(0xFF4DD0E1).withOpacity(0.3) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.settings),
+            ),
             label: 'Cuenta',
           ),
-
         ],
       ),
     );
@@ -491,36 +678,95 @@ class _HomePageState extends State<HomePage> {
         Expanded(
           child: _items.isEmpty
               ? const Center(child: Text('Aún no hay gastos registrados.'))
-              : ListView.separated(
+              : ListView.builder(
+            padding: const EdgeInsets.all(12),
             itemCount: _items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, i) {
               final it = _items[i];
-              return ListTile(
-                title: Text(it.amount != null
-                    ? '${it.currency ?? ""} ${it.amount!.toStringAsFixed(2)}'
-                    : '(monto no detectado)'),
-                subtitle: Text([
-                  it.category ?? 'Otros',
-                  if (it.merchant != null && it.merchant!.isNotEmpty) it.merchant!,
-                  df.format(DateTime.fromMillisecondsSinceEpoch(it.timestampMs)),
-                ].join(' • ')),
-                isThreeLine: true,
-                trailing: IconButton(
-                  tooltip: 'Ver texto crudo',
-                  icon: const Icon(Icons.description),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Notificación (raw)'),
-                        content: SingleChildScrollView(child: Text(it.rawText ?? '')),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
-                        ],
-                      ),
-                    );
-                  },
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    it.amount != null
+                                        ? '${it.currency ?? ""} ${it.amount!.toStringAsFixed(2)}'
+                                        : '(monto no detectado)',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    [
+                                      it.category ?? 'Otros',
+                                      if (it.merchant != null && it.merchant!.isNotEmpty) it.merchant!,
+                                    ].join(' • '),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    df.format(DateTime.fromMillisecondsSinceEpoch(it.timestampMs)),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              width: 100,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Editar categoría',
+                                    icon: const Icon(Icons.edit, size: 20),
+                                    onPressed: () => _showEditCategoryDialog(it, context),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Ver texto crudo',
+                                    icon: const Icon(Icons.description, size: 20),
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          title: const Text('Notificación (raw)'),
+                                          content: SingleChildScrollView(child: Text(it.rawText ?? '')),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               );
             },
@@ -533,6 +779,72 @@ class _HomePageState extends State<HomePage> {
   // Vista de gráficos por categorías
   Widget _buildCategoryChart() {
     return SummaryTab(expenses: _items);
+  }
+}
+
+/// Widget de fondo dinámico animado (verde limón a blanco)
+class _AnimatedGradientBg extends StatefulWidget {
+  final Widget child;
+
+  const _AnimatedGradientBg({required this.child});
+
+  @override
+  State<_AnimatedGradientBg> createState() => _AnimatedGradientBgState();
+}
+
+class _AnimatedGradientBgState extends State<_AnimatedGradientBg>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final progress = _controller.value;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        
+        // Light mode: verde limón a blanco
+        // Dark mode: colores oscuros sutiles
+        final color1 = Color.lerp(
+          isDark ? const Color(0xFF1A2332) : const Color(0xFFE8FF9D),
+          isDark ? const Color(0xFF2A3F5F) : const Color(0xFFFFFFFF),
+          (math.sin(progress * 2 * math.pi) + 1) / 2,
+        )!;
+
+        final color2 = Color.lerp(
+          isDark ? const Color(0xFF253447) : const Color(0xFFF5FFF0),
+          isDark ? const Color(0xFF1A2332) : const Color(0xFFE8FF9D),
+          (math.cos(progress * 2 * math.pi) + 1) / 2,
+        )!;
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [color1, color2],
+            ),
+          ),
+          child: widget.child,
+        );
+      },
+    );
   }
 }
 

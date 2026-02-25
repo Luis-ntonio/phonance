@@ -36,7 +36,9 @@ android {
             }
             keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
             keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
-            storeFile = file(keystoreProperties.getProperty("storeFile") ?: "")
+            storeFile = keystoreProperties.getProperty("storeFile")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { file(it) }
             storePassword = keystoreProperties.getProperty("storePassword") ?: ""
         }
     }

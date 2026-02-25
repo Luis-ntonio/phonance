@@ -118,7 +118,12 @@ class ExpensesHistoryChart extends StatelessWidget {
             BarChartData(
               maxY: (maxY == 0.0) ? 10.0 : maxY * 1.2,
               minY: 0,
-              gridData: FlGridData(show: true),
+              gridData: FlGridData(
+                show: true,
+                horizontalInterval: null,
+                drawHorizontalLine: false,
+                drawVerticalLine: false,
+              ),
               titlesData: FlTitlesData(
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(

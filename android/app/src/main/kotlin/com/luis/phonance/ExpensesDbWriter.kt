@@ -69,6 +69,16 @@ object ExpensesDbWriter {
         val db = openOrCreate(context)
 
         try {
+            // Detectar si viene de Gmail
+            val isFromGmail = sourcePackage == "com.google.android.gm"
+            
+            // Si es de Gmail, verificar si ya existe un gasto similar de Google Pay en los últimos 5 min
+            if (isFromGmail && existsSimilarFromGPay(db, timestampMs, amount, currency, merchant)) {
+                Log.d(TAG, "Duplicate ignored (Gmail skipped: similar GPay transaction within 5 min)")
+                return
+            }
+            
+            // Verificar duplicados generales (mismo dedupeKey)
             if (existsSimilar(db, timestampMs, amount, currency, merchant)) {
                 Log.d(TAG, "Duplicate ignored (similar expense)")
                 return
@@ -118,6 +128,58 @@ object ExpensesDbWriter {
         val to = timestampMs + windowMs
 
         val where = StringBuilder("timestampMs BETWEEN ? AND ? AND ABS(amount - ?) < 0.01")
+        val args = ArrayList<String>()
+        args.add(from.toString())
+        args.add(to.toString())
+        args.add(amount.toString())
+
+        if (currency == null) {
+            where.append(" AND currency IS NULL")
+        } else {
+            where.append(" AND currency = ?")
+            args.add(currency)
+        }
+
+        if (merchant == null || merchant.isBlank()) {
+            where.append(" AND (merchant IS NULL OR merchant = '')")
+        } else {
+            where.append(" AND merchant = ?")
+            args.add(merchant)
+        }
+
+        val cursor = db.query(
+            "expenses",
+            arrayOf("id"),
+            where.toString(),
+            args.toTypedArray(),
+            null,
+            null,
+            null,
+            "1"
+        )
+
+        cursor.use {
+            return it.moveToFirst()
+        }
+    }
+
+    private fun existsSimilarFromGPay(
+        db: SQLiteDatabase,
+        timestampMs: Long,
+        amount: Double?,
+        currency: String?,
+        merchant: String?,
+        windowMs: Long = 5 * 60 * 1000
+    ): Boolean {
+        if (amount == null) return false
+
+        val from = timestampMs - windowMs
+        val to = timestampMs + windowMs
+
+        val where = StringBuilder(
+            "timestampMs BETWEEN ? AND ? AND ABS(amount - ?) < 0.01 " +
+            "AND sourcePackage = 'com.google.android.apps.walletnfcrel'"
+        )
         val args = ArrayList<String>()
         args.add(from.toString())
         args.add(to.toString())

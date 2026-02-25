@@ -1,5 +1,7 @@
 {
-  "whyContinueWithGen1": "I find the Gen 1 CLI easier to use",
+  "providers": [
+    "awscloudformation"
+  ],
   "projectName": "Phonance",
   "version": "3.1",
   "frontend": "flutter",
@@ -7,8 +9,5 @@
     "config": {
       "ResDir": "./lib/"
     }
-  },
-  "providers": [
-    "awscloudformation"
-  ]
+  }
 }

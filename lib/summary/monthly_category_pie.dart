@@ -50,8 +50,8 @@ class _MonthlyCategoryPieState extends State<MonthlyCategoryPie> {
           // Fondo: el PieChart
           PieChart(
             PieChartData(
-              sectionsSpace: 2,
-              centerSpaceRadius: 40,
+              sectionsSpace: 3,
+              centerSpaceRadius: 45,
               sections: sections,
               pieTouchData: PieTouchData(
                 touchCallback: (FlTouchEvent event, PieTouchResponse? response) {

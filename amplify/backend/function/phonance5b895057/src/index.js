@@ -13,7 +13,7 @@ Amplify Params - DO NOT EDIT */
  * @type {import('@types/aws-lambda').APIGatewayProxyHandler}
  */
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
+const { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, ScanCommand } = require("@aws-sdk/lib-dynamodb");
 
 const EXPENSES_TABLE =
   process.env.STORAGE_PHONANCEEXPENSES_NAME || process.env.EXPENSES_TABLE;
@@ -25,7 +25,7 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,PUT,POST,PATCH,OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type,Authorization",
 };
 
@@ -156,6 +156,14 @@ exports.handler = async (event) => {
           return putProfile(userId, payload);
         }
         break;
+
+      case "PATCH":
+        if (path.endsWith("/expenses")) {
+          const payload = parseJson(event.body);
+          if (!payload) return json(400, { message: "Invalid JSON body." });
+          return patchExpense(userId, payload);
+        }
+        break;
     }
 
     return json(404, { message: "Not Found" });
@@ -259,4 +267,44 @@ function stringOrEmpty(v) {
 function numberOrZero(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+async function patchExpense(userId, payload) {
+  try {
+    const dedupeKey = String(payload.dedupeKey || "");
+    const timestampMs = Number(payload.timestampMs);
+    const category = payload.category ?? null;
+
+    if (!dedupeKey || !Number.isFinite(timestampMs)) {
+      return json(400, { message: "Missing dedupeKey or timestampMs" });
+    }
+
+    // Construir la sk directamente usando timestampMs + dedupeKey
+    const sk = `${pad13(timestampMs)}#${dedupeKey}`;
+
+    console.log(`Attempting to update item with userId=${userId}, sk=${sk}`);
+
+    // Usar UpdateCommand directamente con la sk construida
+    const updateParams = {
+      TableName: EXPENSES_TABLE,
+      Key: {
+        userId,
+        sk,
+      },
+      UpdateExpression: "SET category = :cat, updatedAt = :now",
+      ExpressionAttributeValues: {
+        ":cat": category,
+        ":now": Date.now(),
+      },
+      ReturnValues: "ALL_NEW",
+    };
+
+    const updateRes = await ddb.send(new UpdateCommand(updateParams));
+    
+    console.log("Update successful:", JSON.stringify(updateRes.Attributes));
+    return json(200, updateRes.Attributes || {});
+  } catch (err) {
+    console.error("DynamoDB Patch error:", err);
+    return json(500, { message: "Error updating expense", error: String(err) });
+  }
 }

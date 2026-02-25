@@ -49,6 +49,29 @@ class ExpensesApi {
     }
   }
 
+  static Future<void> updateExpenseCategory(String dedupeKey, int timestampMs, String category) async {
+    final headers = await _jwtHeaders();
+    final body = jsonEncode({
+      'dedupeKey': dedupeKey,
+      'timestampMs': timestampMs,
+      'category': category,
+    });
+
+    debugPrint('PATCH /expenses body: $body');
+
+    final op = Amplify.API.patch(
+      _path,
+      apiName: _apiName,
+      body: HttpPayload.string(body, contentType: 'application/json'),
+      headers: headers,
+    );
+
+    final res = await op.response;
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('PATCH /expenses failed: ${res.statusCode} ${res.decodeBody()}');
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getExpenses({
     required int fromMs,
     int? toMs,

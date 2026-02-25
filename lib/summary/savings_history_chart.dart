@@ -95,7 +95,12 @@ class SavingsHistoryChart extends StatelessWidget {
         BarChartData(
           minY: chartMinY,
           maxY: chartMaxY,
-          gridData: FlGridData(show: true),
+          gridData: FlGridData(
+            show: true,
+            horizontalInterval: null,
+            drawHorizontalLine: false,
+            drawVerticalLine: false,
+          ),
           titlesData: FlTitlesData(
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(

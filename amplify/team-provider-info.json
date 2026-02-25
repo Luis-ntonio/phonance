@@ -1,0 +1,64 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-phonance-dev-bfb04-authRole",
+      "UnauthRoleArn": "arn:aws:iam::012468946780:role/amplify-phonance-dev-bfb04-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::012468946780:role/amplify-phonance-dev-bfb04-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-phonance-dev-bfb04-deployment",
+      "UnauthRoleName": "amplify-phonance-dev-bfb04-unauthRole",
+      "StackName": "amplify-phonance-dev-bfb04",
+      "StackId": "arn:aws:cloudformation:us-east-1:012468946780:stack/amplify-phonance-dev-bfb04/a574c0f0-f01f-11f0-8b0d-0affd19328cd",
+      "AmplifyAppId": "d1vqpx34arv124",
+      "APIGatewayAuthURL": "https://s3.amazonaws.com/amplify-phonance-dev-bfb04-deployment/amplify-cfn-templates/api/APIGatewayAuthStack.json",
+      "AuthTriggerTemplateURL": "https://s3.amazonaws.com/amplify-phonance-dev-bfb04-deployment/amplify-cfn-templates/auth/auth-trigger-cloudformation-template.json"
+    },
+    "categories": {
+      "function": {
+        "phonance5b895057": {
+          "tableName": "phonanceDynamo-dev",
+          "deploymentBucketName": "amplify-phonance-dev-bfb04-deployment",
+          "s3Key": "amplify-builds/phonance5b895057-4d2b353457755853557a-build.zip"
+        },
+        "phonanceCheckSubscription": {
+          "mpAccessToken": "APP_USR-7476161842704225-012515-c956a049691d8a97b77fcb4c44ca1489-3155792628",
+          "deploymentBucketName": "amplify-phonance-dev-bfb04-deployment",
+          "s3Key": "amplify-builds/phonanceCheckSubscription-3554384b50476e59647a-build.zip"
+        },
+        "phonanceMPLink": {
+          "mpAccessToken": "APP_USR-7476161842704225-012515-c956a049691d8a97b77fcb4c44ca1489-3155792628",
+          "mpWebhookUrl": "https://bo61j3ubkb.execute-api.us-east-1.amazonaws.com/dev/webhook",
+          "successUrl": "https://www.google.com/?zx=1769380169897&no_sw_cr=1",
+          "deploymentBucketName": "amplify-phonance-dev-bfb04-deployment",
+          "s3Key": "amplify-builds/phonanceMPLink-3571557a68336b655649-build.zip"
+        },
+        "phonanceSubscriptions": {
+          "mpAccessToken": "TEST-3248198733523496-011617-97e683a7338f2162742e9a6d4c30e511-3140161458",
+          "mpWebhookSecret": "22d356e0bec55ef659b148f783a7e3b60139f601b3a4d0bd7b17b1df3814b920",
+          "mpWebhookTestSecret": "46bf4d10fa1f90301680e63687a496dca406a38ec0335be50f9e96b3ab29db8e",
+          "deploymentBucketName": "amplify-phonance-dev-bfb04-deployment",
+          "s3Key": "amplify-builds/phonanceSubscriptions-61716b4b2f6e50613237-build.zip"
+        },
+        "phonancesubscription": {
+          "mpAccessToken": "APP_USR-7476161842704225-012515-c956a049691d8a97b77fcb4c44ca1489-3155792628",
+          "deploymentBucketName": "amplify-phonance-dev-bfb04-deployment",
+          "s3Key": "amplify-builds/phonancesubscription-49657271304e32554e58-build.zip"
+        },
+        "phonanceabd269a5PreSignup": {
+          "deploymentBucketName": "amplify-phonance-dev-bfb04-deployment",
+          "s3Key": "amplify-builds/phonanceabd269a5PreSignup-484c4472485767507841-build.zip"
+        }
+      },
+      "auth": {
+        "phonanceabd269a5": {}
+      },
+      "storage": {
+        "phonanceDynamo": {},
+        "phonanceExpenses": {}
+      },
+      "api": {
+        "phonanceApi": {}
+      }
+    }
+  }
+}

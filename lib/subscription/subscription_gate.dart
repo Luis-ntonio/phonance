@@ -6,7 +6,15 @@ import 'subscription_page.dart';
 
 class SubscriptionGate extends StatefulWidget {
   final ExpensesDb db;
-  const SubscriptionGate({super.key, required this.db});
+  final VoidCallback onDarkModeToggle;
+  final bool isDarkMode;
+
+  const SubscriptionGate({
+    super.key,
+    required this.db,
+    required this.onDarkModeToggle,
+    required this.isDarkMode,
+  });
 
   @override
   State<SubscriptionGate> createState() => _SubscriptionGateState();
@@ -86,6 +94,10 @@ class _SubscriptionGateState extends State<SubscriptionGate> {
       );
     }
 
-    return HomePage(db: widget.db);
+    return HomePage(
+      db: widget.db,
+      onDarkModeToggle: widget.onDarkModeToggle,
+      isDarkMode: widget.isDarkMode,
+    );
   }
 }
