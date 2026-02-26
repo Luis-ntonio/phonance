@@ -21,7 +21,15 @@ Future<void> debugAuthSession() async {
 
 class SignupPage extends StatefulWidget {
   final ExpensesDb db;
-  const SignupPage({super.key, required this.db});
+  final VoidCallback onDarkModeToggle;
+  final bool isDarkMode;
+
+  const SignupPage({
+    super.key,
+    required this.db,
+    required this.onDarkModeToggle,
+    required this.isDarkMode,
+  });
 
   @override
   State<SignupPage> createState() => _SignupPageState();
@@ -128,7 +136,13 @@ class _SignupPageState extends State<SignupPage> {
       // 4) Navegar a suscripcion
 
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => SubscriptionGate(db: widget.db)),
+        MaterialPageRoute(
+          builder: (_) => SubscriptionGate(
+            db: widget.db,
+            onDarkModeToggle: widget.onDarkModeToggle,
+            isDarkMode: widget.isDarkMode,
+          ),
+        ),
       );
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));

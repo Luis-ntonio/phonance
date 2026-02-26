@@ -10,7 +10,15 @@ import '../main.dart';
 
 class AuthGate extends StatelessWidget {
   final ExpensesDb db;
-  const AuthGate({super.key, required this.db});
+  final VoidCallback onDarkModeToggle;
+  final bool isDarkMode;
+
+  const AuthGate({
+    super.key,
+    required this.db,
+    required this.onDarkModeToggle,
+    required this.isDarkMode,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +29,17 @@ class AuthGate extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         final signedIn = snap.hasData && (snap.data?.isSignedIn == true);
-        return signedIn ? SubscriptionGate(db: db) : LoginPage(db: db);
+        return signedIn
+            ? SubscriptionGate(
+                db: db,
+                onDarkModeToggle: onDarkModeToggle,
+                isDarkMode: isDarkMode,
+              )
+            : LoginPage(
+                db: db,
+                onDarkModeToggle: onDarkModeToggle,
+                isDarkMode: isDarkMode,
+              );
       },
     );
   }

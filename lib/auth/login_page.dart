@@ -9,7 +9,15 @@ import '../subscription/subscription_gate.dart';
 
 class LoginPage extends StatefulWidget {
   final ExpensesDb db;
-  const LoginPage({super.key, required this.db});
+  final VoidCallback onDarkModeToggle;
+  final bool isDarkMode;
+
+  const LoginPage({
+    super.key,
+    required this.db,
+    required this.onDarkModeToggle,
+    required this.isDarkMode,
+  });
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -42,7 +50,13 @@ class _LoginPageState extends State<LoginPage> {
       if (res.isSignedIn && mounted) {
         // Ir a HomePage
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => SubscriptionGate(db: widget.db)),
+          MaterialPageRoute(
+            builder: (_) => SubscriptionGate(
+              db: widget.db,
+              onDarkModeToggle: widget.onDarkModeToggle,
+              isDarkMode: widget.isDarkMode,
+            ),
+          ),
         );
       } else {
         // Si falta confirmación (según políticas del Pool)
@@ -62,7 +76,13 @@ class _LoginPageState extends State<LoginPage> {
 
   void _goToSignup() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => SignupPage(db: widget.db)),
+      MaterialPageRoute(
+        builder: (_) => SignupPage(
+          db: widget.db,
+          onDarkModeToggle: widget.onDarkModeToggle,
+          isDarkMode: widget.isDarkMode,
+        ),
+      ),
     );
   }
 

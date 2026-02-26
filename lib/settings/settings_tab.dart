@@ -14,9 +14,16 @@ import '../main.dart';
 
 
 class SettingsTab extends StatelessWidget {
-
   final ExpensesDb db;
-  const SettingsTab({super.key, required this.db});
+  final VoidCallback onDarkModeToggle;
+  final bool isDarkMode;
+
+  const SettingsTab({
+    super.key,
+    required this.db,
+    required this.onDarkModeToggle,
+    required this.isDarkMode,
+  });
 
 
   @override
@@ -86,8 +93,14 @@ class SettingsTab extends StatelessWidget {
 
                 await Amplify.Auth.signOut();
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => LoginPage(db: db)),
-                      (r) => false,
+                  MaterialPageRoute(
+                    builder: (_) => LoginPage(
+                      db: db,
+                      onDarkModeToggle: onDarkModeToggle,
+                      isDarkMode: isDarkMode,
+                    ),
+                  ),
+                  (r) => false,
                 );
 
               }

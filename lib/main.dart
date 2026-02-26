@@ -87,7 +87,7 @@ class _MyAppState extends State<MyApp> {
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: SubscriptionGate(
+      home: AuthGate(
         db: widget.db,
         onDarkModeToggle: _toggleDarkMode,
         isDarkMode: _isDarkMode,
@@ -101,14 +101,16 @@ class _MyAppState extends State<MyApp> {
       brightness: Brightness.light,
       textTheme: GoogleFonts.poppinsTextTheme(),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF80DEEA),
+        backgroundColor: Color(0xFFFFFFFF),
         foregroundColor: Color(0xFF00695C),
-        elevation: 0,
+        elevation: 2,
+        shadowColor: Color(0x1A000000),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: Color(0xFF80DEEA),
+        backgroundColor: Color(0xFFFFFFFF),
         selectedItemColor: Color(0xFF00695C),
         unselectedItemColor: Color(0xFF004D40),
+        elevation: 8,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -144,7 +146,7 @@ class _MyAppState extends State<MyApp> {
       ),
     );
   }
-
+}
 
 class HomePage extends StatefulWidget {
   final ExpensesDb db;
@@ -594,7 +596,11 @@ class _HomePageState extends State<HomePage> {
             ? _buildCategoryChart()
             : _selectedIndex == 1
               ? _buildExpenseList(df)
-              : SettingsTab(db: widget.db),
+              : SettingsTab(
+                  db: widget.db,
+                  onDarkModeToggle: widget.onDarkModeToggle,
+                  isDarkMode: widget.isDarkMode,
+                ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
