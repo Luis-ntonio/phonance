@@ -1,12 +1,30 @@
-const expensesDb = new Map();
+const { Firestore, FieldValue } = require("@google-cloud/firestore");
+
+const db = new Firestore();
+const EXPENSES_COLLECTION = "expenses";
 
 function json(res, status, body) {
-  res.status(status).set({
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
-    "Content-Type": "application/json"
-  }).send(JSON.stringify(body ?? {}));
+  res
+    .status(status)
+    .set({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
+      "Content-Type": "application/json",
+    })
+    .send(JSON.stringify(body ?? {}));
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function getUserId(req) {
@@ -14,87 +32,108 @@ function getUserId(req) {
   if (byHeader) return byHeader;
   const auth = req.get("authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
-  return token ? `user_${token.slice(0, 12)}` : null;
+  const payload = decodeJwtPayload(token);
+  return payload?.user_id || payload?.sub || payload?.uid || null;
 }
 
-function getBucket(userId) {
-  if (!expensesDb.has(userId)) expensesDb.set(userId, []);
-  return expensesDb.get(userId);
+function expenseDocId(userId, timestampMs, dedupeKey) {
+  return `${userId}_${timestampMs}_${dedupeKey}`;
 }
 
 exports.handler = async (req, res) => {
-  if (req.method === "OPTIONS") {
-    return res.status(204).set({
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id"
-    }).send("");
-  }
-
-  if (req.path !== "/expenses") return json(res, 404, { message: "Not Found" });
-
-  const userId = getUserId(req);
-  if (!userId) return json(res, 401, { message: "Unauthorized" });
-
-  const bucket = getBucket(userId);
-
-  if (req.method === "GET") {
-    const fromMs = req.query.fromMs ? Number(req.query.fromMs) : 0;
-    const toMs = req.query.toMs ? Number(req.query.toMs) : Number.MAX_SAFE_INTEGER;
-    const limit = req.query.limit ? Math.min(Number(req.query.limit), 2000) : 500;
-
-    const items = bucket
-      .filter((item) => item.timestampMs >= fromMs && item.timestampMs <= toMs)
-      .sort((a, b) => b.timestampMs - a.timestampMs)
-      .slice(0, limit);
-
-    return json(res, 200, { items });
-  }
-
-  if (req.method === "POST") {
-    const payload = req.body || {};
-    const timestampMs = Number(payload.timestampMs);
-    const dedupeKey = String(payload.dedupeKey || "");
-    if (!Number.isFinite(timestampMs) || !dedupeKey) {
-      return json(res, 400, { message: "Missing timestampMs or dedupeKey" });
+  try {
+    if (req.method === "OPTIONS") {
+      return res
+        .status(204)
+        .set({
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
+        })
+        .send("");
     }
 
-    const exists = bucket.find((item) => item.dedupeKey === dedupeKey && item.timestampMs === timestampMs);
-    if (exists) return json(res, 409, { message: "Expense already exists (duplicate)." });
+    if (req.path !== "/expenses") return json(res, 404, { message: "Not Found" });
 
-    const item = {
-      userId,
-      sk: `${String(timestampMs).padStart(13, "0")}#${dedupeKey}`,
-      timestampMs,
-      dedupeKey,
-      amount: payload.amount ?? null,
-      currency: payload.currency ?? null,
-      merchant: payload.merchant ?? null,
-      category: payload.category ?? null,
-      rawText: payload.rawText ?? null,
-      sourcePackage: payload.sourcePackage ?? null,
-      createdAt: Date.now()
-    };
+    const userId = getUserId(req);
+    if (!userId) return json(res, 401, { message: "Unauthorized" });
 
-    bucket.push(item);
-    return json(res, 201, item);
-  }
+    if (req.method === "GET") {
+      const fromMs = req.query.fromMs ? Number(req.query.fromMs) : 0;
+      const toMs = req.query.toMs ? Number(req.query.toMs) : Number.MAX_SAFE_INTEGER;
+      const limit = req.query.limit ? Math.min(Number(req.query.limit), 2000) : 500;
 
-  if (req.method === "PATCH") {
-    const payload = req.body || {};
-    const timestampMs = Number(payload.timestampMs);
-    const dedupeKey = String(payload.dedupeKey || "");
-    if (!Number.isFinite(timestampMs) || !dedupeKey) {
-      return json(res, 400, { message: "Missing dedupeKey or timestampMs" });
+      const snapshot = await db.collection(EXPENSES_COLLECTION).where("userId", "==", userId).get();
+
+      const items = snapshot.docs
+        .map((doc) => doc.data())
+        .filter((item) => item.timestampMs >= fromMs && item.timestampMs <= toMs)
+        .sort((a, b) => b.timestampMs - a.timestampMs)
+        .slice(0, limit);
+
+      return json(res, 200, { items });
     }
 
-    const item = bucket.find((entry) => entry.timestampMs === timestampMs && entry.dedupeKey === dedupeKey);
-    if (!item) return json(res, 404, { message: "Expense not found" });
+    if (req.method === "POST") {
+      const payload = req.body || {};
+      const timestampMs = Number(payload.timestampMs);
+      const dedupeKey = String(payload.dedupeKey || "");
+      if (!Number.isFinite(timestampMs) || !dedupeKey) {
+        return json(res, 400, { message: "Missing timestampMs or dedupeKey" });
+      }
 
-    item.category = payload.category ?? item.category;
-    item.updatedAt = Date.now();
-    return json(res, 200, item);
+      const docId = expenseDocId(userId, timestampMs, dedupeKey);
+      const ref = db.collection(EXPENSES_COLLECTION).doc(docId);
+      const existing = await ref.get();
+      if (existing.exists) return json(res, 409, { message: "Expense already exists (duplicate)." });
+
+      const item = {
+        userId,
+        sk: `${String(timestampMs).padStart(13, "0")}#${dedupeKey}`,
+        timestampMs,
+        dedupeKey,
+        amount: payload.amount ?? null,
+        currency: payload.currency ?? null,
+        merchant: payload.merchant ?? null,
+        category: payload.category ?? null,
+        rawText: payload.rawText ?? null,
+        sourcePackage: payload.sourcePackage ?? null,
+        createdAt: FieldValue.serverTimestamp(),
+      };
+
+      await ref.set(item);
+      const saved = await ref.get();
+      return json(res, 201, saved.data());
+    }
+
+    if (req.method === "PATCH") {
+      const payload = req.body || {};
+      const timestampMs = Number(payload.timestampMs);
+      const dedupeKey = String(payload.dedupeKey || "");
+      if (!Number.isFinite(timestampMs) || !dedupeKey) {
+        return json(res, 400, { message: "Missing dedupeKey or timestampMs" });
+      }
+
+      const docId = expenseDocId(userId, timestampMs, dedupeKey);
+      const ref = db.collection(EXPENSES_COLLECTION).doc(docId);
+      const existing = await ref.get();
+      if (!existing.exists) return json(res, 404, { message: "Expense not found" });
+
+      await ref.set(
+        {
+          category: payload.category ?? existing.data()?.category ?? null,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const saved = await ref.get();
+      return json(res, 200, saved.data());
+    }
+
+    return json(res, 405, { message: "Method not allowed" });
+  } catch (error) {
+    console.error("expenses error", error);
+    return json(res, 500, { message: "Internal Server Error" });
   }
-
-  return json(res, 405, { message: "Method not allowed" });
 };
