@@ -5,6 +5,12 @@ const db = process.env.FIRESTORE_DATABASE_ID
   : new Firestore();
 const EXPENSES_COLLECTION = "expenses";
 
+function isExpectedPath(req, expectedPath) {
+  const raw = (req.path || req.url || "").split("?")[0].toLowerCase();
+  const expected = expectedPath.toLowerCase();
+  return raw === expected || raw.endsWith(expected) || raw === "/" || raw === "";
+}
+
 function json(res, status, body) {
   res
     .status(status)
@@ -71,7 +77,7 @@ exports.handler = async (req, res) => {
         .send("");
     }
 
-    if (req.path !== "/expenses") return json(res, 404, { message: "Not Found" });
+    if (!isExpectedPath(req, "/expenses")) return json(res, 404, { message: "Not Found" });
 
     const userId = getUserId(req);
     if (!userId) return json(res, 401, { message: "Unauthorized" });

@@ -7,6 +7,12 @@ function json(res, status, body) {
   }).send(JSON.stringify(body ?? {}));
 }
 
+function isExpectedPath(req, expectedPath) {
+  const raw = (req.path || req.url || "").split("?")[0].toLowerCase();
+  const expected = expectedPath.toLowerCase();
+  return raw === expected || raw.endsWith(expected) || raw === "/" || raw === "";
+}
+
 function getUserId(req) {
   const byHeader = req.get("x-user-id");
   if (byHeader) return byHeader;
@@ -36,7 +42,7 @@ exports.handler = async (req, res) => {
     }).send("");
   }
 
-  if (req.path !== "/getMPlink") return json(res, 404, { message: "Not Found" });
+  if (!isExpectedPath(req, "/getMPlink")) return json(res, 404, { message: "Not Found" });
   if (req.method !== "POST") return json(res, 405, { message: "Method not allowed" });
 
   const userId = getUserId(req);
