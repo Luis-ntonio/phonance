@@ -1,8 +1,6 @@
 const { Firestore } = require("@google-cloud/firestore");
 
-const db = process.env.FIRESTORE_DATABASE_ID
-  ? new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID })
-  : new Firestore();
+const db = new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID || "users" });
 const USERS_COLLECTION = "users";
 
 function isExpectedPath(req, expectedPath) {
@@ -88,6 +86,10 @@ exports.handler = async (req, res) => {
     });
   } catch (error) {
     console.error("subscription error", error);
-    return json(res, 500, { message: "Internal Server Error" });
+    return json(res, 500, {
+      message: "Internal Server Error",
+      detail: String(error?.message || error),
+      code: error?.code || null,
+    });
   }
 };

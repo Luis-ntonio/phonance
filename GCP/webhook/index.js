@@ -1,8 +1,6 @@
 const { Firestore, FieldValue } = require("@google-cloud/firestore");
 
-const db = process.env.FIRESTORE_DATABASE_ID
-  ? new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID })
-  : new Firestore();
+const db = new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID || "users" });
 const USERS_COLLECTION = "users";
 const EVENTS_COLLECTION = "webhook_events";
 
@@ -93,6 +91,10 @@ exports.handler = async (req, res) => {
     });
   } catch (error) {
     console.error("webhook error", error);
-    return json(res, 500, { message: "Internal Server Error" });
+    return json(res, 500, {
+      message: "Internal Server Error",
+      detail: String(error?.message || error),
+      code: error?.code || null,
+    });
   }
 };
