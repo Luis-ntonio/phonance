@@ -6,6 +6,12 @@ const db = process.env.FIRESTORE_DATABASE_ID
 const USERS_COLLECTION = "users";
 const EVENTS_COLLECTION = "webhook_events";
 
+function isExpectedPath(req, expectedPath) {
+  const raw = (req.path || req.url || "").split("?")[0].toLowerCase();
+  const expected = expectedPath.toLowerCase();
+  return raw === expected || raw.endsWith(expected) || raw === "/" || raw === "";
+}
+
 function json(res, status, body) {
   res
     .status(status)
@@ -45,7 +51,7 @@ exports.handler = async (req, res) => {
         .send("");
     }
 
-    if (req.path !== "/webhook") return json(res, 404, { message: "Not Found" });
+    if (!isExpectedPath(req, "/webhook")) return json(res, 404, { message: "Not Found" });
     if (req.method !== "POST") return json(res, 405, { message: "Method not allowed" });
 
     const payload = req.body || {};

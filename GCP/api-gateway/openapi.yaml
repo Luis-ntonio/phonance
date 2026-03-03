@@ -14,9 +14,9 @@ securityDefinitions:
     type: oauth2
     flow: implicit
     authorizationUrl: ""
-    x-google-issuer: "https://securetoken.google.com/phonance-486106"
+    x-google-issuer: "https://securetoken.google.com/phonance-43490"
     x-google-jwks_uri: "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
-    x-google-audiences: "phonance-486106"
+    x-google-audiences: "phonance-43490"
 
 paths:
   /profile:

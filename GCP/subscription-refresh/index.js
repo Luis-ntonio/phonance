@@ -5,6 +5,12 @@ const db = process.env.FIRESTORE_DATABASE_ID
   : new Firestore();
 const USERS_COLLECTION = "users";
 
+function isExpectedPath(req, expectedPath) {
+  const raw = (req.path || req.url || "").split("?")[0].toLowerCase();
+  const expected = expectedPath.toLowerCase();
+  return raw === expected || raw.endsWith(expected) || raw === "/" || raw === "";
+}
+
 function json(res, status, body) {
   res
     .status(status)
@@ -67,7 +73,7 @@ exports.handler = async (req, res) => {
         .send("");
     }
 
-    if (req.path !== "/subscription/refresh") return json(res, 404, { message: "Not Found" });
+    if (!isExpectedPath(req, "/subscription/refresh")) return json(res, 404, { message: "Not Found" });
     if (req.method !== "POST") return json(res, 405, { message: "Method not allowed" });
 
     const userId = getUserId(req);
