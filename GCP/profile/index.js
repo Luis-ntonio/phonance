@@ -1,72 +1,103 @@
-const dummyDb = new Map();
+const { Firestore, FieldValue } = require("@google-cloud/firestore");
+
+const db = new Firestore();
+const USERS_COLLECTION = "users";
 
 function json(res, status, body) {
-  res.status(status).set({
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
-    "Content-Type": "application/json"
-  }).send(JSON.stringify(body ?? {}));
+  res
+    .status(status)
+    .set({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
+      "Content-Type": "application/json",
+    })
+    .send(JSON.stringify(body ?? {}));
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function getUserId(req) {
-  const raw = req.get("x-user-id");
-  if (raw) return raw;
+  const byHeader = req.get("x-user-id");
+  if (byHeader) return byHeader;
 
   const auth = req.get("authorization") || "";
   if (!auth) return null;
 
   const token = auth.replace(/^Bearer\s+/i, "").trim();
-  return token ? `user_${token.slice(0, 12)}` : null;
+  const payload = decodeJwtPayload(token);
+  return payload?.user_id || payload?.sub || payload?.uid || null;
 }
 
-function normalizeProfile(userId, payload) {
+function normalizeProfile(userId, payload, previous = {}) {
   return {
     username: userId,
-    name: String(payload?.name || ""),
-    email: String(payload?.email || ""),
-    phoneNumber: String(payload?.phoneNumber || ""),
-    preferredCurrency: String(payload?.preferredCurrency || "PEN"),
-    savingsGoal: Number(payload?.savingsGoal || 0),
-    monthlyIncome: Number(payload?.monthlyIncome || 0),
-    spendingLimit: Number(payload?.spendingLimit || 0),
-    isSubscribed: payload?.isSubscribed === true,
-    subscriptionUpdatedAt: Number(payload?.subscriptionUpdatedAt || 0),
-    updatedAt: Date.now()
+    name: String(payload?.name ?? previous?.name ?? ""),
+    email: String(payload?.email ?? previous?.email ?? ""),
+    phoneNumber: String(payload?.phoneNumber ?? previous?.phoneNumber ?? ""),
+    preferredCurrency: String(payload?.preferredCurrency ?? previous?.preferredCurrency ?? "PEN"),
+    savingsGoal: Number(payload?.savingsGoal ?? previous?.savingsGoal ?? 0),
+    monthlyIncome: Number(payload?.monthlyIncome ?? previous?.monthlyIncome ?? 0),
+    spendingLimit: Number(payload?.spendingLimit ?? previous?.spendingLimit ?? 0),
+    isSubscribed: payload?.isSubscribed === true || previous?.isSubscribed === true,
+    subscriptionUpdatedAt: Number(payload?.subscriptionUpdatedAt ?? previous?.subscriptionUpdatedAt ?? 0),
+    updatedAt: FieldValue.serverTimestamp(),
   };
 }
 
 exports.handler = async (req, res) => {
-  if (req.method === "OPTIONS") {
-    return res.status(204).set({
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id"
-    }).send("");
+  try {
+    if (req.method === "OPTIONS") {
+      return res
+        .status(204)
+        .set({
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
+        })
+        .send("");
+    }
+
+    if (req.path !== "/profile") return json(res, 404, { message: "Not Found" });
+
+    const userId = getUserId(req);
+    if (!userId) return json(res, 401, { message: "Unauthorized" });
+
+    const userRef = db.collection(USERS_COLLECTION).doc(userId);
+
+    if (req.method === "GET") {
+      const snapshot = await userRef.get();
+      if (!snapshot.exists) return json(res, 404, { message: "Profile not found" });
+      return json(res, 200, snapshot.data());
+    }
+
+    if (req.method === "POST" || req.method === "PUT") {
+      const existing = await userRef.get();
+      const previous = existing.exists ? existing.data() : {};
+      const profile = normalizeProfile(userId, req.body || {}, previous);
+
+      if (!existing.exists) {
+        profile.createdAt = FieldValue.serverTimestamp();
+      }
+
+      await userRef.set(profile, { merge: true });
+      const saved = await userRef.get();
+      return json(res, req.method === "POST" ? 201 : 200, saved.data());
+    }
+
+    return json(res, 405, { message: "Method not allowed" });
+  } catch (error) {
+    console.error("profile error", error);
+    return json(res, 500, { message: "Internal Server Error" });
   }
-
-  if (req.path !== "/profile") {
-    return json(res, 404, { message: "Not Found" });
-  }
-
-  const userId = getUserId(req);
-  if (!userId) return json(res, 401, { message: "Unauthorized" });
-
-  if (req.method === "GET") {
-    const item = dummyDb.get(userId);
-    if (!item) return json(res, 404, { message: "Profile not found" });
-    return json(res, 200, item);
-  }
-
-  if (req.method === "POST" || req.method === "PUT") {
-    const profile = normalizeProfile(userId, req.body || {});
-    const prev = dummyDb.get(userId);
-    if (!prev) profile.createdAt = Date.now();
-    else profile.createdAt = prev.createdAt;
-
-    dummyDb.set(userId, profile);
-    return json(res, req.method === "POST" ? 201 : 200, profile);
-  }
-
-  return json(res, 405, { message: "Method not allowed" });
 };

@@ -25,7 +25,12 @@ Para cada servicio:
    - `MP_ACCESS_TOKEN`
    - `SUCCESS_URL`
 
+## Base de datos (Firestore)
+
+- Colección de usuarios: `users`
+- Colección de gastos: `expenses`
+
 ## Notas
 
-- Esta versión usa conexión a BD **dummy** (en memoria) para facilitar pruebas y despliegue inicial.
-- Reemplaza `dummyDb` por Firestore cuando hagas la migración definitiva.
+- Los endpoints privados toman el usuario desde el JWT (validado por API Gateway).
+- `webhook` permanece público y actualiza suscripción en `users` cuando llega un evento `approved/authorized`.

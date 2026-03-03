@@ -10,9 +10,21 @@ function json(res, status, body) {
 function getUserId(req) {
   const byHeader = req.get("x-user-id");
   if (byHeader) return byHeader;
+
   const auth = req.get("authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
-  return token ? `user_${token.slice(0, 12)}` : null;
+  if (!token) return null;
+
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const payload = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+    return payload?.user_id || payload?.sub || payload?.uid || null;
+  } catch {
+    return null;
+  }
 }
 
 exports.handler = async (req, res) => {

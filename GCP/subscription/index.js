@@ -1,12 +1,30 @@
-const subscriptionDb = new Map();
+const { Firestore } = require("@google-cloud/firestore");
+
+const db = new Firestore();
+const USERS_COLLECTION = "users";
 
 function json(res, status, body) {
-  res.status(status).set({
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
-    "Content-Type": "application/json"
-  }).send(JSON.stringify(body ?? {}));
+  res
+    .status(status)
+    .set({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
+      "Content-Type": "application/json",
+    })
+    .send(JSON.stringify(body ?? {}));
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function getUserId(req) {
@@ -14,28 +32,38 @@ function getUserId(req) {
   if (byHeader) return byHeader;
   const auth = req.get("authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
-  return token ? `user_${token.slice(0, 12)}` : null;
+  const payload = decodeJwtPayload(token);
+  return payload?.user_id || payload?.sub || payload?.uid || null;
 }
 
 exports.handler = async (req, res) => {
-  if (req.method === "OPTIONS") {
-    return res.status(204).set({
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id"
-    }).send("");
+  try {
+    if (req.method === "OPTIONS") {
+      return res
+        .status(204)
+        .set({
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
+        })
+        .send("");
+    }
+
+    if (req.path !== "/subscription") return json(res, 404, { message: "Not Found" });
+    if (req.method !== "GET") return json(res, 405, { message: "Method not allowed" });
+
+    const userId = getUserId(req);
+    if (!userId) return json(res, 401, { message: "Unauthorized" });
+
+    const snapshot = await db.collection(USERS_COLLECTION).doc(userId).get();
+    const data = snapshot.exists ? snapshot.data() : {};
+
+    return json(res, 200, {
+      isSubscribed: data?.isSubscribed === true,
+      subscriptionUpdatedAt: data?.subscriptionUpdatedAt ?? null,
+    });
+  } catch (error) {
+    console.error("subscription error", error);
+    return json(res, 500, { message: "Internal Server Error" });
   }
-
-  if (req.path !== "/subscription") return json(res, 404, { message: "Not Found" });
-  if (req.method !== "GET") return json(res, 405, { message: "Method not allowed" });
-
-  const userId = getUserId(req);
-  if (!userId) return json(res, 401, { message: "Unauthorized" });
-
-  const state = subscriptionDb.get(userId) || {
-    isSubscribed: false,
-    subscriptionUpdatedAt: null
-  };
-
-  return json(res, 200, state);
 };
