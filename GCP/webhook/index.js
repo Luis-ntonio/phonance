@@ -1,6 +1,8 @@
 const { Firestore, FieldValue } = require("@google-cloud/firestore");
 
-const db = new Firestore();
+const db = process.env.FIRESTORE_DATABASE_ID
+  ? new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID })
+  : new Firestore();
 const USERS_COLLECTION = "users";
 const EVENTS_COLLECTION = "webhook_events";
 
