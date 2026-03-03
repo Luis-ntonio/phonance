@@ -8,7 +8,7 @@ import '../subscription/subscription_gate.dart';
 import '../main.dart';
 
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   final ExpensesDb db;
   final VoidCallback onDarkModeToggle;
   final bool isDarkMode;
@@ -21,9 +21,22 @@ class AuthGate extends StatelessWidget {
   });
 
   @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  late final Future<AuthSession> _authSessionFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSessionFuture = Amplify.Auth.fetchAuthSession();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<AuthSession>(
-      future: Amplify.Auth.fetchAuthSession(),
+      future: _authSessionFuture,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -31,14 +44,14 @@ class AuthGate extends StatelessWidget {
         final signedIn = snap.hasData && (snap.data?.isSignedIn == true);
         return signedIn
             ? SubscriptionGate(
-                db: db,
-                onDarkModeToggle: onDarkModeToggle,
-                isDarkMode: isDarkMode,
+                db: widget.db,
+                onDarkModeToggle: widget.onDarkModeToggle,
+                isDarkMode: widget.isDarkMode,
               )
             : LoginPage(
-                db: db,
-                onDarkModeToggle: onDarkModeToggle,
-                isDarkMode: isDarkMode,
+                db: widget.db,
+                onDarkModeToggle: widget.onDarkModeToggle,
+                isDarkMode: widget.isDarkMode,
               );
       },
     );

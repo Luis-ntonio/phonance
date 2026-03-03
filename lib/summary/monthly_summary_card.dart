@@ -34,24 +34,31 @@ class MonthlySummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isNegative = monthlySavingsValue < 0;
     final totalsByCurrency = sumByCurrency(monthExpenses);
+    final colorScheme = Theme.of(context).colorScheme;
+    final savingsColor = loadingProfile
+        ? colorScheme.onSurface
+        : (isNegative ? colorScheme.error : Colors.green);
 
-    return Card(
-      color: const Color(0xFFEDEDED),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeInOutCubic,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: DefaultTextStyle(
-          style: const TextStyle(color: Colors.black87),
+          style: TextStyle(color: colorScheme.onSurface),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Este mes has gastado:', style: TextStyle(fontSize: 16)),
               const SizedBox(height: 8),
-              // Lista de totales por moneda
               ...totalsByCurrency.entries.map((e) => Text(
-                '${e.value.toStringAsFixed(2)} ${e.key}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              )),
+                    '${e.value.toStringAsFixed(2)} ${e.key}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  )),
               const SizedBox(height: 16),
               Text(
                 loadingProfile
@@ -59,7 +66,7 @@ class MonthlySummaryCard extends StatelessWidget {
                     : 'Tus ahorros son: ${monthlySavingsValue.toStringAsFixed(2)} $preferredCurrency',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: loadingProfile ? null : (isNegative ? Colors.red : Colors.green),
+                  color: savingsColor,
                 ),
               ),
             ],

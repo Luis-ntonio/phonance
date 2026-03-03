@@ -87,6 +87,8 @@ class _MyAppState extends State<MyApp> {
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      themeAnimationDuration: const Duration(milliseconds: 650),
+      themeAnimationCurve: Curves.easeInOutCubic,
       home: AuthGate(
         db: widget.db,
         onDarkModeToggle: _toggleDarkMode,
@@ -799,8 +801,12 @@ class _AnimatedGradientBg extends StatefulWidget {
 }
 
 class _AnimatedGradientBgState extends State<_AnimatedGradientBg>
-    with SingleTickerProviderStateMixin {
+  with TickerProviderStateMixin {
   late AnimationController _controller;
+  late AnimationController _themeController;
+  double _darkness = 0;
+  double _fromDarkness = 0;
+  double _toDarkness = 0;
 
   @override
   void initState() {
@@ -809,35 +815,76 @@ class _AnimatedGradientBgState extends State<_AnimatedGradientBg>
       vsync: this,
       duration: const Duration(seconds: 8),
     )..repeat();
+    _themeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    )
+      ..addListener(() {
+        setState(() {
+          _darkness = _fromDarkness + (_toDarkness - _fromDarkness) * _themeController.value;
+        });
+      });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final targetDarkness = Theme.of(context).brightness == Brightness.dark ? 1.0 : 0.0;
+
+    if (!_themeController.isAnimating && _darkness == 0 && _fromDarkness == 0 && _toDarkness == 0) {
+      _darkness = targetDarkness;
+      _fromDarkness = targetDarkness;
+      _toDarkness = targetDarkness;
+      return;
+    }
+
+    if (targetDarkness != _toDarkness) {
+      _fromDarkness = _darkness;
+      _toDarkness = targetDarkness;
+      _themeController.forward(from: 0);
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _themeController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
+      animation: Listenable.merge([_controller, _themeController]),
       builder: (context, _) {
         final progress = _controller.value;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        
-        // Light mode: verde limón a blanco
-        // Dark mode: colores oscuros sutiles
-        final color1 = Color.lerp(
-          isDark ? const Color(0xFF1A2332) : const Color(0xFFE8FF9D),
-          isDark ? const Color(0xFF2A3F5F) : const Color(0xFFFFFFFF),
-          (math.sin(progress * 2 * math.pi) + 1) / 2,
+        final lightPulse = (math.sin(progress * 2 * math.pi) + 1) / 2;
+        final darkPulse = (math.cos(progress * 2 * math.pi) + 1) / 2;
+
+        final lightColor1 = Color.lerp(
+          const Color(0xFFE8FF9D),
+          const Color(0xFFFFFFFF),
+          lightPulse,
+        )!;
+        final lightColor2 = Color.lerp(
+          const Color(0xFFF5FFF0),
+          const Color(0xFFE8FF9D),
+          darkPulse,
         )!;
 
-        final color2 = Color.lerp(
-          isDark ? const Color(0xFF253447) : const Color(0xFFF5FFF0),
-          isDark ? const Color(0xFF1A2332) : const Color(0xFFE8FF9D),
-          (math.cos(progress * 2 * math.pi) + 1) / 2,
+        final darkColor1 = Color.lerp(
+          const Color(0xFF1A2332),
+          const Color(0xFF2A3F5F),
+          lightPulse,
         )!;
+        final darkColor2 = Color.lerp(
+          const Color(0xFF253447),
+          const Color(0xFF1A2332),
+          darkPulse,
+        )!;
+
+        final color1 = Color.lerp(lightColor1, darkColor1, _darkness)!;
+        final color2 = Color.lerp(lightColor2, darkColor2, _darkness)!;
 
         return Container(
           decoration: BoxDecoration(

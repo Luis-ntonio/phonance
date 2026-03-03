@@ -1,0 +1,142 @@
+swagger: "2.0"
+info:
+  title: phonance-api
+  description: API Gateway for Phonance Cloud Run services
+  version: 1.0.0
+
+schemes:
+  - https
+produces:
+  - application/json
+
+securityDefinitions:
+  firebase:
+    type: oauth2
+    flow: implicit
+    authorizationUrl: ""
+    x-google-issuer: "https://securetoken.google.com/phonance-486106"
+    x-google-jwks_uri: "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
+    x-google-audiences: "phonance-486106"
+
+paths:
+  /profile:
+    get:
+      operationId: getProfile
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-profile-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: postProfile
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-profile-647799297855.southamerica-west1.run.app
+      responses:
+        "201":
+          description: Created
+    put:
+      operationId: putProfile
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-profile-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+
+  /expenses:
+    get:
+      operationId: getExpenses
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-expenses-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: postExpense
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-expenses-647799297855.southamerica-west1.run.app
+      responses:
+        "201":
+          description: Created
+    patch:
+      operationId: patchExpense
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-expenses-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+
+  /subscription:
+    get:
+      operationId: getSubscription
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-subscription-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+
+  /subscription/refresh:
+    post:
+      operationId: refreshSubscription
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-subscription-refresh-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+
+  /subscription/summary:
+    get:
+      operationId: summarySubscription
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-subscription-summary-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+
+  /subscription/cancel:
+    post:
+      operationId: cancelSubscription
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-subscription-cancel-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+
+  /getMPlink:
+    post:
+      operationId: getMPlink
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://phonance-getmplink-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
+
+  /webhook:
+    post:
+      operationId: webhook
+      x-google-backend:
+        address: https://phonance-webhook-647799297855.southamerica-west1.run.app
+      responses:
+        "200":
+          description: OK
