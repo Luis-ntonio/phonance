@@ -22,8 +22,11 @@ Para cada servicio:
 3. En **Tipo de compilación**, usa Node.js vía Buildpacks.
 4. En **Objetivo de la función**, usa: `handler`.
 5. Configura variables de entorno (si aplica):
-   - `MP_ACCESS_TOKEN`
-   - `SUCCESS_URL`
+   - `MP_ACCESS_TOKEN` (requerido en `getMPlink`, `subscription-refresh`, `subscription-summary`, `subscription-cancel`, `webhook`)
+   - `MP_WEBHOOK_SECRET` (opcional pero recomendado en `webhook` para validar firma)
+   - `SUCCESS_URL` (requerido en `getMPlink`)
+   - `FIRESTORE_DATABASE_ID=users` para servicios de perfil/suscripción/webhook
+   - `FIRESTORE_DATABASE_ID=expenses` para el servicio de gastos
 
 ## Base de datos (Firestore)
 

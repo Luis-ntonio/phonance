@@ -1,9 +1,8 @@
 const { Firestore } = require("@google-cloud/firestore");
 
-const db = process.env.FIRESTORE_DATABASE_ID
-  ? new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID })
-  : new Firestore();
+const db = new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID || "users" });
 const USERS_COLLECTION = "users";
+const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || "";
 
 function isExpectedPath(req, expectedPath) {
   const raw = (req.path || req.url || "").split("?")[0].toLowerCase();
@@ -78,13 +77,54 @@ exports.handler = async (req, res) => {
 
     const userId = getUserId(req);
     if (!userId) return json(res, 401, { message: "Unauthorized" });
+    if (!MP_ACCESS_TOKEN) return json(res, 500, { message: "MP_ACCESS_TOKEN missing" });
+
+    const searchUrl =
+      "https://api.mercadopago.com/preapproval/search" +
+      `?external_reference=${encodeURIComponent(userId)}` +
+      "&sort=date_created:desc&limit=1";
+
+    const searchResponse = await fetch(searchUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!searchResponse.ok) {
+      const body = await safeJson(searchResponse);
+      console.error("subscription-cancel search failed", searchResponse.status, body);
+      return json(res, 502, { message: "Failed to cancel subscription" });
+    }
+
+    const searchData = await searchResponse.json();
+    const preapproval = (searchData?.results ?? [])[0] ?? null;
+    const preapprovalId = preapproval?.id;
+    if (!preapprovalId) return json(res, 404, { message: "No subscription found to cancel" });
+
+    const cancelResponse = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+
+    const cancelData = await safeJson(cancelResponse);
+    if (!cancelResponse.ok) {
+      console.error("subscription-cancel mp put failed", cancelResponse.status, cancelData);
+      return json(res, 502, { message: "Failed to cancel subscription" });
+    }
 
     const subscriptionUpdatedAt = Date.now();
     const payload = {
       isSubscribed: false,
       subscriptionUpdatedAt,
-      mpStatus: "cancelled",
-      mpPreapprovalId: `pre_${userId}`,
+      mpStatus: cancelData?.status ?? "cancelled",
+      mpSubscriptionStatus: cancelData?.status ?? "cancelled",
+      mpPreapprovalId: preapprovalId,
     };
 
     await db.collection(USERS_COLLECTION).doc(userId).set(payload, { merge: true });
@@ -99,6 +139,18 @@ exports.handler = async (req, res) => {
     });
   } catch (error) {
     console.error("subscription-cancel error", error);
-    return json(res, 500, { message: "Internal Server Error" });
+    return json(res, 500, {
+      message: "Internal Server Error",
+      detail: String(error?.message || error),
+      code: error?.code || null,
+    });
   }
 };
+
+async function safeJson(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}

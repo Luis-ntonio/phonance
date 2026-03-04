@@ -1,8 +1,6 @@
 const { Firestore, FieldValue } = require("@google-cloud/firestore");
 
-const db = process.env.FIRESTORE_DATABASE_ID
-  ? new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID })
-  : new Firestore();
+const db = new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID || "expenses" });
 const EXPENSES_COLLECTION = "expenses";
 
 function isExpectedPath(req, expectedPath) {
@@ -158,6 +156,10 @@ exports.handler = async (req, res) => {
     return json(res, 405, { message: "Method not allowed" });
   } catch (error) {
     console.error("expenses error", error);
-    return json(res, 500, { message: "Internal Server Error" });
+    return json(res, 500, {
+      message: "Internal Server Error",
+      detail: String(error?.message || error),
+      code: error?.code || null,
+    });
   }
 };
