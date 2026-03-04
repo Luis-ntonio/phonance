@@ -14,7 +14,7 @@ function json(res, status, body) {
     .status(status)
     .set({
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
       "Content-Type": "application/json",
     })
@@ -65,24 +65,46 @@ exports.handler = async (req, res) => {
         .status(204)
         .set({
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET,OPTIONS",
+          "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
         })
         .send("");
     }
 
     if (!isExpectedPath(req, "/subscription")) return json(res, 404, { message: "Not Found" });
-    if (req.method !== "GET") return json(res, 405, { message: "Method not allowed" });
+
+    if (req.method !== "GET" && req.method !== "PUT") {
+      return json(res, 405, { message: "Method not allowed" });
+    }
 
     const userId = getUserId(req);
     if (!userId) return json(res, 401, { message: "Unauthorized" });
 
-    const snapshot = await db.collection(USERS_COLLECTION).doc(userId).get();
-    const data = snapshot.exists ? snapshot.data() : {};
+    const ref = db.collection(USERS_COLLECTION).doc(userId);
+
+    if (req.method === "GET") {
+      const snapshot = await ref.get();
+      const data = snapshot.exists ? snapshot.data() : {};
+      return json(res, 200, {
+        isSubscribed: data?.isSubscribed === true,
+        subscriptionUpdatedAt: data?.subscriptionUpdatedAt ?? null,
+      });
+    }
+
+    const isSubscribed = req.body?.isSubscribed === true;
+    const subscriptionUpdatedAt = Date.now();
+
+    await ref.set(
+      {
+        isSubscribed,
+        subscriptionUpdatedAt,
+      },
+      { merge: true }
+    );
 
     return json(res, 200, {
-      isSubscribed: data?.isSubscribed === true,
-      subscriptionUpdatedAt: data?.subscriptionUpdatedAt ?? null,
+      isSubscribed,
+      subscriptionUpdatedAt,
     });
   } catch (error) {
     console.error("subscription error", error);

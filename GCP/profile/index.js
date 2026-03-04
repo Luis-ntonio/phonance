@@ -1,7 +1,13 @@
 const { Firestore, FieldValue } = require("@google-cloud/firestore");
 
-const db = new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID || "users" });
 const USERS_COLLECTION = "users";
+let dbClient = null;
+
+function getDb() {
+  if (dbClient) return dbClient;
+  dbClient = new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID || "users" });
+  return dbClient;
+}
 
 function isExpectedPath(req, expectedPath) {
   const raw = (req.path || req.url || "").split("?")[0].toLowerCase();
@@ -61,6 +67,11 @@ function getUserId(req) {
 }
 
 function normalizeProfile(userId, payload, previous = {}) {
+  const hasIncomingSubscribed = typeof payload?.isSubscribed === "boolean";
+  const resolvedSubscribed = hasIncomingSubscribed
+    ? payload.isSubscribed === true
+    : previous?.isSubscribed === true;
+
   return {
     username: userId,
     name: String(payload?.name ?? previous?.name ?? ""),
@@ -70,7 +81,7 @@ function normalizeProfile(userId, payload, previous = {}) {
     savingsGoal: Number(payload?.savingsGoal ?? previous?.savingsGoal ?? 0),
     monthlyIncome: Number(payload?.monthlyIncome ?? previous?.monthlyIncome ?? 0),
     spendingLimit: Number(payload?.spendingLimit ?? previous?.spendingLimit ?? 0),
-    isSubscribed: payload?.isSubscribed === true || previous?.isSubscribed === true,
+    isSubscribed: resolvedSubscribed,
     subscriptionUpdatedAt: Number(payload?.subscriptionUpdatedAt ?? previous?.subscriptionUpdatedAt ?? 0),
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -94,6 +105,7 @@ exports.handler = async (req, res) => {
     const userId = getUserId(req);
     if (!userId) return json(res, 401, { message: "Unauthorized" });
 
+    const db = getDb();
     const userRef = db.collection(USERS_COLLECTION).doc(userId);
 
     if (req.method === "GET") {
@@ -103,9 +115,19 @@ exports.handler = async (req, res) => {
     }
 
     if (req.method === "POST" || req.method === "PUT") {
+      const body = req.body || {};
       const existing = await userRef.get();
       const previous = existing.exists ? existing.data() : {};
-      const profile = normalizeProfile(userId, req.body || {}, previous);
+
+      if (req.method === "POST") {
+        const hasName = typeof body?.name === "string" && body.name.trim().length > 0;
+        const hasEmail = typeof body?.email === "string" && body.email.trim().length > 0;
+        if (!hasName || !hasEmail) {
+          return json(res, 400, { message: "Missing required fields: email and name." });
+        }
+      }
+
+      const profile = normalizeProfile(userId, body, previous);
 
       if (!existing.exists) {
         profile.createdAt = FieldValue.serverTimestamp();
