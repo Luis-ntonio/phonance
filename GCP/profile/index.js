@@ -1,12 +1,33 @@
 const { Firestore, FieldValue } = require("@google-cloud/firestore");
 
 const USERS_COLLECTION = "users";
+const configuredDatabaseId = (process.env.FIRESTORE_DATABASE_ID || "users").trim();
 let dbClient = null;
+let defaultDbClient = null;
 
 function getDb() {
   if (dbClient) return dbClient;
-  dbClient = new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID || "users" });
+  dbClient = new Firestore({ databaseId: configuredDatabaseId });
   return dbClient;
+}
+
+function getDefaultDb() {
+  if (defaultDbClient) return defaultDbClient;
+  defaultDbClient = new Firestore();
+  return defaultDbClient;
+}
+
+async function withFirestoreFallback(run) {
+  try {
+    return await run(getDb());
+  } catch (error) {
+    if (error?.code !== 3) throw error;
+    console.warn("profile firestore invalid databaseId, retrying with default", {
+      configuredDatabaseId,
+      detail: String(error?.message || error),
+    });
+    return run(getDefaultDb());
+  }
 }
 
 function isExpectedPath(req, expectedPath) {
@@ -105,19 +126,20 @@ exports.handler = async (req, res) => {
     const userId = getUserId(req);
     if (!userId) return json(res, 401, { message: "Unauthorized" });
 
-    const db = getDb();
-    const userRef = db.collection(USERS_COLLECTION).doc(userId);
-
     if (req.method === "GET") {
-      const snapshot = await userRef.get();
+      const snapshot = await withFirestoreFallback(async (db) =>
+        db.collection(USERS_COLLECTION).doc(userId).get()
+      );
       if (!snapshot.exists) return json(res, 404, { message: "Profile not found" });
       return json(res, 200, snapshot.data());
     }
 
     if (req.method === "POST" || req.method === "PUT") {
       const body = req.body || {};
-      const existing = await userRef.get();
-      const previous = existing.exists ? existing.data() : {};
+      const existing = await withFirestoreFallback(async (db) =>
+        db.collection(USERS_COLLECTION).doc(userId).get()
+      );
+      const previous = existing.exists ? (existing.data() || {}) : {};
 
       if (req.method === "POST") {
         const hasName = typeof body?.name === "string" && body.name.trim().length > 0;
@@ -133,8 +155,13 @@ exports.handler = async (req, res) => {
         profile.createdAt = FieldValue.serverTimestamp();
       }
 
-      await userRef.set(profile, { merge: true });
-      const saved = await userRef.get();
+      await withFirestoreFallback(async (db) => {
+        const userRef = db.collection(USERS_COLLECTION).doc(userId);
+        await userRef.set(profile, { merge: true });
+      });
+      const saved = await withFirestoreFallback(async (db) =>
+        db.collection(USERS_COLLECTION).doc(userId).get()
+      );
       return json(res, req.method === "POST" ? 201 : 200, saved.data());
     }
 
@@ -145,6 +172,7 @@ exports.handler = async (req, res) => {
       message: "Internal Server Error",
       detail: String(error?.message || error),
       code: error?.code || null,
+      databaseId: configuredDatabaseId,
     });
   }
 };
