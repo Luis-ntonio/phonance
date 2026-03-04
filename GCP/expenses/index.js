@@ -1,7 +1,34 @@
 const { Firestore, FieldValue } = require("@google-cloud/firestore");
 
-const db = new Firestore({ databaseId: process.env.FIRESTORE_DATABASE_ID || "expenses" });
+const configuredDatabaseId = (process.env.FIRESTORE_DATABASE_ID || "expenses").trim();
+let dbClient = null;
+let defaultDbClient = null;
 const EXPENSES_COLLECTION = "expenses";
+
+function getDb() {
+  if (dbClient) return dbClient;
+  dbClient = new Firestore({ databaseId: configuredDatabaseId });
+  return dbClient;
+}
+
+function getDefaultDb() {
+  if (defaultDbClient) return defaultDbClient;
+  defaultDbClient = new Firestore();
+  return defaultDbClient;
+}
+
+async function withFirestoreFallback(run) {
+  try {
+    return await run(getDb());
+  } catch (error) {
+    if (error?.code !== 3) throw error;
+    console.warn("expenses firestore invalid databaseId, retrying with default", {
+      configuredDatabaseId,
+      detail: String(error?.message || error),
+    });
+    return run(getDefaultDb());
+  }
+}
 
 function isExpectedPath(req, expectedPath) {
   const raw = (req.path || req.url || "").split("?")[0].toLowerCase();
@@ -85,7 +112,9 @@ exports.handler = async (req, res) => {
       const toMs = req.query.toMs ? Number(req.query.toMs) : Number.MAX_SAFE_INTEGER;
       const limit = req.query.limit ? Math.min(Number(req.query.limit), 2000) : 500;
 
-      const snapshot = await db.collection(EXPENSES_COLLECTION).where("userId", "==", userId).get();
+      const snapshot = await withFirestoreFallback(async (db) =>
+        db.collection(EXPENSES_COLLECTION).where("userId", "==", userId).get()
+      );
 
       const items = snapshot.docs
         .map((doc) => doc.data())
@@ -105,8 +134,9 @@ exports.handler = async (req, res) => {
       }
 
       const docId = expenseDocId(userId, timestampMs, dedupeKey);
-      const ref = db.collection(EXPENSES_COLLECTION).doc(docId);
-      const existing = await ref.get();
+      const ref = withFirestoreFallback(async (db) => db.collection(EXPENSES_COLLECTION).doc(docId));
+      const resolvedRef = await ref;
+      const existing = await withFirestoreFallback(async () => resolvedRef.get());
       if (existing.exists) return json(res, 409, { message: "Expense already exists (duplicate)." });
 
       const item = {
@@ -123,8 +153,8 @@ exports.handler = async (req, res) => {
         createdAt: FieldValue.serverTimestamp(),
       };
 
-      await ref.set(item);
-      const saved = await ref.get();
+      await withFirestoreFallback(async () => resolvedRef.set(item));
+      const saved = await withFirestoreFallback(async () => resolvedRef.get());
       return json(res, 201, saved.data());
     }
 
@@ -137,19 +167,19 @@ exports.handler = async (req, res) => {
       }
 
       const docId = expenseDocId(userId, timestampMs, dedupeKey);
-      const ref = db.collection(EXPENSES_COLLECTION).doc(docId);
-      const existing = await ref.get();
+      const ref = await withFirestoreFallback(async (db) => db.collection(EXPENSES_COLLECTION).doc(docId));
+      const existing = await withFirestoreFallback(async () => ref.get());
       if (!existing.exists) return json(res, 404, { message: "Expense not found" });
 
-      await ref.set(
+      await withFirestoreFallback(async () => ref.set(
         {
           category: payload.category ?? existing.data()?.category ?? null,
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
-      );
+      ));
 
-      const saved = await ref.get();
+      const saved = await withFirestoreFallback(async () => ref.get());
       return json(res, 200, saved.data());
     }
 
@@ -160,6 +190,7 @@ exports.handler = async (req, res) => {
       message: "Internal Server Error",
       detail: String(error?.message || error),
       code: error?.code || null,
+      databaseId: configuredDatabaseId,
     });
   }
 };
