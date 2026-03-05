@@ -1,7 +1,6 @@
-// subscription_api.dart
 import 'dart:convert';
-import 'package:amplify_flutter/amplify_flutter.dart';
-import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
+
+import '../gcp_api_client.dart';
 
 class SubscriptionStatus {
   final bool isSubscribed;
@@ -9,110 +8,58 @@ class SubscriptionStatus {
 
   SubscriptionStatus({required this.isSubscribed, this.subscriptionUpdatedAt});
 
-  factory SubscriptionStatus.fromJson(Map<String, dynamic> j) {
+  factory SubscriptionStatus.fromJson(Map<String, dynamic> json) {
     return SubscriptionStatus(
-      isSubscribed: (j['isSubscribed'] == true),
-      subscriptionUpdatedAt: (j['subscriptionUpdatedAt'] as num?)?.toInt(),
+      isSubscribed: json['isSubscribed'] == true,
+      subscriptionUpdatedAt: (json['subscriptionUpdatedAt'] as num?)?.toInt(),
     );
   }
 }
 
 class SubscriptionApi {
-  static const String _apiName = 'phonanceApi';
   static const String _path = '/subscription';
 
-  static Future<Map<String, String>> _jwtHeaders() async {
-    final session = await Amplify.Auth.fetchAuthSession() as CognitoAuthSession;
-    final idToken = session.userPoolTokensResult.value.idToken.raw;
-
-    return {
-      // en la mayoría de authorizers sirve con Bearer:
-      'Authorization': '$idToken',
-      'Content-Type': 'application/json',
-    };
-  }
-
   static Future<SubscriptionSummary> getSummary() async {
-    final headers = await _jwtHeaders();
-    final op = Amplify.API.get(
-      '/subscription/summary',
-      apiName: _apiName,
-      headers: headers,
-    );
-    final res = await op.response;
-    final map = json.decode(res.decodeBody()) as Map<String, dynamic>;
+    final response = await GcpApiClient.get('/subscription/summary');
+    final map = jsonDecode(response.body) as Map<String, dynamic>;
     return SubscriptionSummary.fromJson(map);
   }
 
   static Future<void> cancel() async {
-    final headers = await _jwtHeaders();
-    final op = Amplify.API.post(
-      '/subscription/cancel',
-      apiName: _apiName,
-      headers: headers,
-      body: HttpPayload.json({}),
-    );
-    await op.response; // si no lanza, ok
+    final response = await GcpApiClient.post('/subscription/cancel', body: {});
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('POST /subscription/cancel failed: ${response.statusCode} ${response.body}');
+    }
   }
 
   static Future<SubscriptionStatus> getStatus() async {
-      final headers = await _jwtHeaders();
-
-      final operation = Amplify.API.get(_path, apiName: _apiName, headers: headers);
-      //logging
-
-
-      final response = await operation.response;
-
-      // decodeBody é o padrão para Amplify v2
-      final map = json.decode(response.decodeBody()) as Map<String, dynamic>;
-      return SubscriptionStatus.fromJson(map);
-
-  }
-
-  static Future<SubscriptionStatus> refreshStatus() async {
-    final headers = await _jwtHeaders();
-
-    final op = Amplify.API.post(
-      '/subscription/refresh',
-      apiName: _apiName,
-      headers: headers,
-      body: HttpPayload.json({}),
-    );
-
-    final res = await op.response;
-    final map = json.decode(res.decodeBody()) as Map<String, dynamic>;
+    final response = await GcpApiClient.get(_path);
+    final map = jsonDecode(response.body) as Map<String, dynamic>;
     return SubscriptionStatus.fromJson(map);
   }
 
-  static Future<Uri> createCheckoutUrl(userId) async {
-    final headers = await _jwtHeaders();
+  static Future<SubscriptionStatus> refreshStatus() async {
+    final response = await GcpApiClient.post('/subscription/refresh', body: {});
+    final map = jsonDecode(response.body) as Map<String, dynamic>;
+    return SubscriptionStatus.fromJson(map);
+  }
 
-    final operation = Amplify.API.post(
+  static Future<Uri> createCheckoutUrl(String userId) async {
+    final response = await GcpApiClient.post(
       '/getMPlink',
-      apiName: _apiName,
-      headers: headers,
-      body: HttpPayload.json({
-        // opcional: puedes enviar un planKey/planId si tienes más de un plan
-        'order_id': userId,
-      }),
+      body: {'order_id': userId},
     );
 
-    final response = await operation.response;
-    final map = json.decode(response.decodeBody()) as Map<String, dynamic>;
-
+    final map = jsonDecode(response.body) as Map<String, dynamic>;
     final checkoutUrl = (map['checkout_url'] ?? map['init_point']) as String?;
+
     if (checkoutUrl == null || checkoutUrl.isEmpty) {
       throw Exception('Backend no devolvió checkout_url');
     }
 
     return Uri.parse(checkoutUrl);
   }
-
-// Nota: setSubscribed será chamado pelo seu Webhook no backend AWS
-// quando o Mercado Pago confirmar o pagamento.
 }
-
 
 class SubscriptionSummary {
   final bool isSubscribed;
@@ -122,8 +69,8 @@ class SubscriptionSummary {
   final String? currency;
   final int? frequency;
   final String? frequencyType;
-  final String? lastPaymentDate; // ISO
-  final String? nextChargeDate;  // ISO
+  final String? lastPaymentDate;
+  final String? nextChargeDate;
 
   SubscriptionSummary({
     required this.isSubscribed,
@@ -137,11 +84,12 @@ class SubscriptionSummary {
     this.nextChargeDate,
   });
 
-  factory SubscriptionSummary.fromJson(Map<String, dynamic> j) {
-    final mp = (j['mp'] as Map?)?.cast<String, dynamic>() ?? {};
-    final billing = (j['billing'] as Map?)?.cast<String, dynamic>() ?? {};
+  factory SubscriptionSummary.fromJson(Map<String, dynamic> json) {
+    final mp = (json['mp'] as Map?)?.cast<String, dynamic>() ?? {};
+    final billing = (json['billing'] as Map?)?.cast<String, dynamic>() ?? {};
+
     return SubscriptionSummary(
-      isSubscribed: j['isSubscribed'] == true,
+      isSubscribed: json['isSubscribed'] == true,
       mpStatus: (mp['status'] ?? 'unknown').toString(),
       preapprovalId: mp['preapprovalId']?.toString(),
       amount: mp['amount'],
@@ -153,4 +101,3 @@ class SubscriptionSummary {
     );
   }
 }
-

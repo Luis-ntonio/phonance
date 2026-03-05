@@ -1,23 +1,10 @@
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:amplify_flutter/amplify_flutter.dart' hide UserProfile;
+import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
 import './profile_api.dart';
-import 'confirm_sign_up_page.dart';
-import '../subscription/subscription_gate.dart';
-
-import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
-
-Future<void> debugAuthSession() async {
-  final session = await Amplify.Auth.fetchAuthSession();
-  safePrint('isSignedIn: ${session.isSignedIn}');
-
-  if (session is CognitoAuthSession) {
-    safePrint('identityId: ${session.identityIdResult}');
-    safePrint('awsCredentials: ${session.credentialsResult}');
-    safePrint('userPoolTokens: ${session.userPoolTokensResult}');
-  }
-}
 
 class SignupPage extends StatefulWidget {
   final ExpensesDb db;
@@ -65,54 +52,24 @@ class _SignupPageState extends State<SignupPage> {
 
     setState(() => _busy = true);
     try {
+      final signupWatch = Stopwatch()..start();
+      debugPrint('[SIGNUP] start');
       final email = _emailCtrl.text.trim();
       final password = _passCtrl.text;
       final name = _nameCtrl.text.trim();
       final phoneNumber = _phoneCtrl.text.trim();
 
-
-      final result = await Amplify.Auth.signUp(
-        username: email,
+      debugPrint('[SIGNUP] creating firebase user');
+      final createWatch = Stopwatch()..start();
+      final credentials = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
         password: password,
-        options: SignUpOptions(
-          userAttributes: {
-            AuthUserAttributeKey.email: email,       // recomendado pasar email explícitamente
-            AuthUserAttributeKey.phoneNumber: "+51$phoneNumber", // número de teléfono
-            AuthUserAttributeKey.name: name,         // nombre estándar
-          },
-        ),
       );
+      createWatch.stop();
 
-      //confirmacion
-
-      switch (result.nextStep.signUpStep) {
-        case AuthSignUpStep.confirmSignUp:
-        // Abre la pantalla de confirmación
-          final confirmed = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(builder: (_) => ConfirmSignUpPage(email: email)),
-          );
-          if (confirmed != true) {
-            // El usuario no confirmó; muestra aviso y corta flujo
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Registro pendiente de confirmación.')),
-            );
-            return;
-          }
-          break;
-        case AuthSignUpStep.done:
-        // Nada extra; el usuario ya está confirmado
-          break;
-      }
-
-      final signInRes = await Amplify.Auth.signIn(username: email, password: password);
-      if (!signInRes.isSignedIn) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cuenta creada. Revisa tu correo para confirmar el registro.')),
-        );
-        return;
-      }
-
-      await debugAuthSession();
+      debugPrint('[SIGNUP] firebase user created uid=${credentials.user?.uid} in ${createWatch.elapsedMilliseconds}ms');
+      await credentials.user?.sendEmailVerification();
+      debugPrint('[SIGNUP] verification email sent');
 
       // 2) Construye el perfil
       final profile = UserProfile(
@@ -128,24 +85,35 @@ class _SignupPageState extends State<SignupPage> {
         //deberia agregar si ya pago suscripcion
       );
 
-      // 3) Persistir el perfil en tu API (DynamoDB via Lambda)
-      // Si aún no tienes el endpoint, deja este paso para luego.
-      await ProfileApi.upsertProfile(profile);
-
       if (!mounted) return;
-      // 4) Navegar a suscripcion
+      debugPrint('[SIGNUP] signup done at ${signupWatch.elapsedMilliseconds}ms, returning to AuthGate');
+      Navigator.of(context).maybePop();
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => SubscriptionGate(
-            db: widget.db,
-            onDarkModeToggle: widget.onDarkModeToggle,
-            isDarkMode: widget.isDarkMode,
-          ),
-        ),
+      unawaited(
+        (() async {
+          final backgroundWatch = Stopwatch()..start();
+          try {
+            await credentials.user?.updateDisplayName(name);
+            debugPrint('[SIGNUP][BG] displayName updated');
+          } catch (displayNameError) {
+            debugPrint('[SIGNUP][BG] displayName update failed: $displayNameError');
+          }
+
+          debugPrint('[SIGNUP][BG] syncing profile to gateway');
+          try {
+            await ProfileApi.upsertProfile(profile).timeout(const Duration(seconds: 12));
+            backgroundWatch.stop();
+            debugPrint('[SIGNUP][BG] profile sync ok in ${backgroundWatch.elapsedMilliseconds}ms');
+          } catch (profileError) {
+            backgroundWatch.stop();
+            debugPrint('[SIGNUP][BG] profile sync failed after ${backgroundWatch.elapsedMilliseconds}ms: $profileError');
+          }
+        })(),
       );
-    } on AuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'No se pudo crear la cuenta.')),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {

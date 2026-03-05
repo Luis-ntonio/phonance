@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,10 +18,10 @@ import './settings/settings_tab.dart';
 
 import './auth/auth_gate.dart';
 import './subscription/subscription_gate.dart';
-import 'amplify_initializer.dart';
 import './apiExpenses/expenses_api.dart';
-import 'package:amplify_flutter/amplify_flutter.dart';
-import '../auth/profile_api.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import './auth/profile_api.dart';
 
 import 'notifications/notification_service.dart';
 import 'gmail_service.dart';
@@ -29,6 +30,8 @@ import 'gmail_service.dart';
 void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp();
 
   await NotificationService().init();
 
@@ -40,8 +43,6 @@ void main() async {
       .resolvePlatformSpecificImplementation<
       AndroidFlutterLocalNotificationsPlugin>();
   await androidPlugin?.requestNotificationsPermission();
-
-  await AmplifyInit.ensureConfigured();
 
   final db = await ExpensesDb.open();
 
@@ -169,9 +170,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   static const _platform = MethodChannel('com.luis.phonance/methods');
   static const _events = EventChannel('com.luis.phonance/events');
+  static final Set<String> _sessionInitializedUsers = <String>{};
+  static final Map<String, double> _sessionMonthlyIncome = <String, double>{};
 
   String? _ownerUserId;
   bool _didInitialCloudLoad = false;
+  bool _isRefreshing = false;
 
   StreamSubscription? _sub;
   bool _hasAccess = false;
@@ -186,11 +190,9 @@ class _HomePageState extends State<HomePage> {
     _init();
   }
 
-  Future<void> _loadFromCloudOnce() async {
-    if (_didInitialCloudLoad) return;
+  Future<void> _loadFromCloud({bool force = false}) async {
+    if (_didInitialCloudLoad && !force) return;
     if (_ownerUserId == null) return;
-
-    _didInitialCloudLoad = true;
 
     // ejemplo: trae últimos 12 meses
     final now = DateTime.now();
@@ -218,19 +220,47 @@ class _HomePageState extends State<HomePage> {
           synced: 1,
         );
       }
+      _didInitialCloudLoad = true;
     } catch (e, st) {
       // no rompas la app si falla cloud; igual tienes local
       debugPrint('fallo al cargar desde cloud:: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('No se pudieron cargar los gastos. Toca Actualizar para reintentar.'),
+            action: SnackBarAction(
+              label: 'Actualizar',
+              onPressed: _refreshExpensesData,
+            ),
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
     }
   }
 
 
   Future<void> _init() async {
-    final user = await Amplify.Auth.getCurrentUser();
-    _ownerUserId = user.userId;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _ownerUserId = user.uid;
 
-    final p = await ProfileApi.getProfile();
+    if (_sessionInitializedUsers.contains(_ownerUserId)) {
+      await _refreshAccess();
+      await _loadItems();
+      _ensureAndroidEvents(_sessionMonthlyIncome[_ownerUserId!] ?? 0.0);
+      return;
+    }
+
+    UserProfile? p;
+    try {
+      p = await ProfileApi.getProfile();
+    } catch (e, st) {
+      debugPrint('fallo al obtener profile en init: $e\n$st');
+      p = null;
+    }
     final monthlyIncome = p?.monthlyIncome ?? 0.0;
+    _sessionMonthlyIncome[_ownerUserId!] = monthlyIncome;
 
     BudgetAlertManager().setUserSettings(
       spendingLimit: p?.spendingLimit.toDouble() ?? 0.0,
@@ -238,6 +268,7 @@ class _HomePageState extends State<HomePage> {
     );
 
     await widget.db.attachLegacyToOwner(_ownerUserId!);
+    await _updateOwnerUserIdForUnassignedExpenses();
     
     // Inicializar Gmail si está disponible (intenta restaurar sesión anterior)
     if (Theme.of(context).platform == TargetPlatform.iOS) {
@@ -247,7 +278,7 @@ class _HomePageState extends State<HomePage> {
       await _refreshGmailStatus();
     }
     
-    await _loadFromCloudOnce();
+    await _loadFromCloud();
     await _refreshAccess();
     await _loadItems();
 
@@ -261,24 +292,89 @@ class _HomePageState extends State<HomePage> {
         await _loadEmailsFromGmail();
       }
     } else {
-      // En Android: solo escuchar eventos para actualizar UI
-      // El guardado en DB ya se hace nativamente en GPayNotificationListener.kt
-      _sub ??= _events.receiveBroadcastStream().listen((event) async {
-        if (event is Map) {
-          debugPrint('Notificación recibida (ya guardada nativamente)');
-          
-          // Solo recargar items y evaluar presupuesto
-          await _loadItems();
-          final expenses = filterCurrentMonth(_items);
-          await BudgetAlertManager().evaluateAndNotify(expenses, monthlyIncome);
-          
-          // Si hay ownerUserId, actualizar los registros que no tienen ownerUserId
-          if (_ownerUserId != null) {
-            await _updateOwnerUserIdForUnassignedExpenses();
-          }
-        }
-      }, onError: (e) {});
+      _ensureAndroidEvents(monthlyIncome);
     }
+
+    _sessionInitializedUsers.add(_ownerUserId!);
+  }
+
+  void _ensureAndroidEvents(double monthlyIncome) {
+    if (Theme.of(context).platform == TargetPlatform.iOS) return;
+
+    _sub ??= _events.receiveBroadcastStream().listen((event) async {
+      if (event is Map) {
+        debugPrint('Notificación recibida (ya guardada nativamente)');
+        await _handleIncomingExpenseEvent(monthlyIncome);
+      }
+    }, onError: (e) {});
+  }
+
+  Future<void> _handleIncomingExpenseEvent(double monthlyIncome) async {
+    await Future.delayed(const Duration(milliseconds: 350));
+    await _loadItems();
+
+    if (_ownerUserId != null) {
+      await _updateOwnerUserIdForUnassignedExpenses();
+    }
+
+    await _loadItems();
+    final expenses = filterCurrentMonth(_items);
+    await BudgetAlertManager().evaluateAndNotify(expenses, monthlyIncome);
+
+    await Future.delayed(const Duration(milliseconds: 500));
+    await _loadItems();
+  }
+
+  Future<void> _refreshExpensesData() async {
+    if (_isRefreshing) return;
+    if (mounted) setState(() => _isRefreshing = true);
+
+    try {
+      await _refreshAccess();
+      final syncedCount = await _syncPendingExpensesToCloud();
+      await _loadFromCloud(force: true);
+      await _loadItems();
+      if (syncedCount > 0) {
+        debugPrint('Refresh completado. Gastos sincronizados a cloud: $syncedCount');
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
+  Future<int> _syncPendingExpensesToCloud() async {
+    if (_ownerUserId == null) return 0;
+
+    final unsyncedExpenses = await widget.db.db.query(
+      'expenses',
+      where: 'synced = 0 AND ownerUserId = ?',
+      whereArgs: [_ownerUserId],
+    );
+
+    var syncedCount = 0;
+    for (final row in unsyncedExpenses) {
+      try {
+        final expense = Expense(
+          id: row['id'] as int?,
+          timestampMs: row['timestampMs'] as int,
+          amount: row['amount'] as double?,
+          currency: row['currency'] as String?,
+          merchant: row['merchant'] as String?,
+          category: row['category'] as String?,
+          rawText: row['rawText'] as String,
+          sourcePackage: row['sourcePackage'] as String,
+          dedupeKey: row['dedupeKey'] as String,
+        );
+
+        await ExpensesApi.postExpense(expense);
+        await widget.db.markSynced(expense.dedupeKey);
+        syncedCount++;
+      } catch (e) {
+        debugPrint('Error syncing expense: $e');
+      }
+    }
+
+    return syncedCount;
   }
 
   Future<void> _updateOwnerUserIdForUnassignedExpenses() async {
@@ -288,34 +384,9 @@ class _HomePageState extends State<HomePage> {
         'UPDATE expenses SET ownerUserId = ? WHERE ownerUserId IS NULL',
         [_ownerUserId]
       );
-      
-      // Sincronizar con cloud los registros no sincronizados
-      final unsyncedExpenses = await widget.db.db.query(
-        'expenses',
-        where: 'synced = 0 AND ownerUserId = ?',
-        whereArgs: [_ownerUserId],
-      );
-      
-      for (final row in unsyncedExpenses) {
-        try {
-          final expense = Expense(
-            id: row['id'] as int?,
-            timestampMs: row['timestampMs'] as int,
-            amount: row['amount'] as double?,
-            currency: row['currency'] as String?,
-            merchant: row['merchant'] as String?,
-            category: row['category'] as String?,
-            rawText: row['rawText'] as String,
-            sourcePackage: row['sourcePackage'] as String,
-            dedupeKey: row['dedupeKey'] as String,
-          );
-          
-          await ExpensesApi.postExpense(expense);
-          await widget.db.markSynced(expense.dedupeKey);
-        } catch (e) {
-          debugPrint('Error syncing expense: $e');
-        }
-      }
+
+      final syncedCount = await _syncPendingExpensesToCloud();
+      if (syncedCount > 0) await _loadItems();
     } catch (e) {
       debugPrint('Error updating ownerUserId: $e');
     }
@@ -341,6 +412,7 @@ class _HomePageState extends State<HomePage> {
       
       // Procesar cada email (aplicando filtro de transacciones válidas)
       int validEmailsCount = 0;
+      int syncedToCloudCount = 0;
       for (final email in emails) {
         // Aplicar el mismo filtro que en el NotificationListener
         if (!email.isValidTransaction()) {
@@ -367,6 +439,7 @@ class _HomePageState extends State<HomePage> {
           try {
             await ExpensesApi.postExpense(expense);
             await widget.db.markSynced(expense.dedupeKey);
+            syncedToCloudCount++;
           } catch (e) {
             debugPrint('Error posting expense: $e');
           }
@@ -378,6 +451,9 @@ class _HomePageState extends State<HomePage> {
       await _saveLastEmailLoadTime(DateTime.now().millisecondsSinceEpoch);
       
       // Recargar items y notificaciones
+      if (syncedToCloudCount > 0) {
+        await _loadFromCloud(force: true);
+      }
       await _loadItems();
       final items = await _loadItems();
       final expenses = filterCurrentMonth(items);
@@ -406,6 +482,7 @@ class _HomePageState extends State<HomePage> {
             const SnackBar(
               content: Text('✅ Gmail conectado exitosamente'),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
             ),
           );
         }
@@ -571,26 +648,33 @@ class _HomePageState extends State<HomePage> {
           ),
           IconButton(
             tooltip: 'Refrescar estado',
-            onPressed: _refreshAccess,
-            icon: const Icon(Icons.refresh),
+            onPressed: _isRefreshing ? null : _refreshExpensesData,
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
           ),
           IconButton(
             tooltip: 'Borrar todo',
             onPressed: _clearAll,
             icon: const Icon(Icons.delete),
           ),
-          IconButton(
-            tooltip: 'Notificación de prueba',
-            onPressed: () async {
-              await TestNotifications.showWalletLikeNotification(
-                currency: 'PEN',
-                // opcional: merchant: 'OXXO ALIAGA',
-                // opcional: amount: 11.89,
-                cardSuffix: '8487',
-              );
-            },
-            icon: const Icon(Icons.science),
-          ),
+          if (kDebugMode)
+            IconButton(
+              tooltip: 'Notificación de prueba',
+              onPressed: () async {
+                await TestNotifications.showWalletLikeNotification(
+                  currency: 'PEN',
+                  // opcional: merchant: 'OXXO ALIAGA',
+                  // opcional: amount: 11.89,
+                  cardSuffix: '8487',
+                );
+              },
+              icon: const Icon(Icons.science),
+            ),
         ],
       ),
       body: _AnimatedGradientBg(

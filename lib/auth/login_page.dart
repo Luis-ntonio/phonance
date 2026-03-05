@@ -1,11 +1,10 @@
 
 // login_page.dart
 import 'package:flutter/material.dart';
-import 'package:amplify_flutter/amplify_flutter.dart';
-import 'auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
 import 'signup_page.dart';
-import '../subscription/subscription_gate.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   final ExpensesDb db;
@@ -41,32 +40,17 @@ class _LoginPageState extends State<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
-      final res = await Amplify.Auth.signIn(
-        username: _emailCtrl.text.trim(),
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
         password: _passCtrl.text,
       );
-
-
-      if (res.isSignedIn && mounted) {
-        // Ir a HomePage
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => SubscriptionGate(
-              db: widget.db,
-              onDarkModeToggle: widget.onDarkModeToggle,
-              isDarkMode: widget.isDarkMode,
-            ),
-          ),
-        );
-      } else {
-        // Si falta confirmación (según políticas del Pool)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inicio de sesión pendiente de confirmación.')),
-        );
-      }
-    } on AuthException catch (e) {
+    } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
+        SnackBar(content: Text(e.message ?? 'No se pudo iniciar sesión.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -81,6 +65,16 @@ class _LoginPageState extends State<LoginPage> {
           db: widget.db,
           onDarkModeToggle: widget.onDarkModeToggle,
           isDarkMode: widget.isDarkMode,
+        ),
+      ),
+    );
+  }
+
+  void _goToForgotPassword() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordPage(
+          initialEmail: _emailCtrl.text.trim(),
         ),
       ),
     );
@@ -135,6 +129,10 @@ class _LoginPageState extends State<LoginPage> {
                             ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Text('Entrar'),
                       ),
+                    ),
+                    TextButton(
+                      onPressed: _busy ? null : _goToForgotPassword,
+                      child: const Text('Olvidé mi contraseña'),
                     ),
                     TextButton(onPressed: _busy ? null : _goToSignup, child: const Text('Crear cuenta')),
                   ]),

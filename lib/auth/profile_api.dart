@@ -1,9 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:amplify_flutter/amplify_flutter.dart';
-import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
-import 'package:amplify_api/amplify_api.dart';
+import '../gcp_api_client.dart';
 
 class UserProfile {
   final String name;
@@ -16,7 +13,6 @@ class UserProfile {
   final int subscriptionUpdatedAt;
   final bool isSubscribed;
 
-
   UserProfile({
     required this.name,
     required this.email,
@@ -26,7 +22,7 @@ class UserProfile {
     required this.monthlyIncome,
     required this.spendingLimit,
     required this.isSubscribed,
-    required this.subscriptionUpdatedAt
+    required this.subscriptionUpdatedAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -38,7 +34,7 @@ class UserProfile {
     'monthlyIncome': monthlyIncome,
     'spendingLimit': spendingLimit,
     'isSubscribed': isSubscribed,
-    'subscriptionUpdatedAt': subscriptionUpdatedAt
+    'subscriptionUpdatedAt': subscriptionUpdatedAt,
   };
 
   static UserProfile fromJson(Map<String, dynamic> j) => UserProfile(
@@ -49,7 +45,7 @@ class UserProfile {
     savingsGoal: (j['savingsGoal'] as num?)?.toDouble() ?? 0.0,
     monthlyIncome: (j['monthlyIncome'] as num?)?.toDouble() ?? 0.0,
     spendingLimit: (j['spendingLimit'] as num?)?.toDouble() ?? 0.0,
-    isSubscribed: (j['isSubscribed'] == true),
+    isSubscribed: j['isSubscribed'] == true,
     subscriptionUpdatedAt: (j['subscriptionUpdatedAt'] as num?)?.toInt() ?? 0,
   );
 
@@ -70,81 +66,35 @@ class UserProfile {
       savingsGoal: savingsGoal ?? this.savingsGoal,
       monthlyIncome: monthlyIncome ?? this.monthlyIncome,
       spendingLimit: spendingLimit ?? this.spendingLimit,
-      isSubscribed: this.isSubscribed,
-      subscriptionUpdatedAt: this.subscriptionUpdatedAt
+      isSubscribed: isSubscribed,
+      subscriptionUpdatedAt: subscriptionUpdatedAt,
     );
   }
 }
 
-
-
 class ProfileApi {
-  static const String _apiName = 'phonanceApi';
   static const String _profilePath = '/profile';
 
-  static Future<Map<String, String>> _authHeaders() async {
-    final session = await Amplify.Auth.fetchAuthSession();
-    final cognito = session as CognitoAuthSession;
+  static Future<UserProfile> upsertProfile(UserProfile profile) async {
+    final response = await GcpApiClient.post(_profilePath, body: profile.toJson());
 
-    if (!cognito.isSignedIn) {
-      throw Exception('No hay sesión iniciada en Cognito.');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Error upserting profile: ${response.statusCode} ${response.body}');
     }
 
-    final tokens = cognito.userPoolTokensResult.value;
-    final idToken = tokens.idToken.raw;
-
-    return <String, String>{
-      'Authorization': 'Bearer $idToken',
-      'Content-Type': 'application/json',
-    };
-  }
-
-  static Future<Map<String, String>> _jwtHeaders() async {
-    final session = await Amplify.Auth.fetchAuthSession() as CognitoAuthSession;
-    final idToken = session.userPoolTokensResult.value.idToken.raw;
-
-    return {
-      // en la mayoría de authorizers sirve con Bearer:
-      'Authorization': '$idToken',
-      'Content-Type': 'application/json',
-    };
-  }
-
-  static Future<UserProfile> upsertProfile(UserProfile p) async {
-    final headers = await _jwtHeaders();
-
-    final req = Amplify.API.post(
-      _profilePath,
-      apiName: _apiName,
-      headers: headers,
-      body: HttpPayload.json(p.toJson()),
-    );
-
-    final res = await req.response;
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Error upserting profile: ${res.statusCode} ${res.decodeBody()}');
-    }
-
-    final map = jsonDecode(res.decodeBody()) as Map<String, dynamic>;
+    final map = jsonDecode(response.body) as Map<String, dynamic>;
     return UserProfile.fromJson(map);
   }
 
   static Future<UserProfile?> getProfile() async {
-    final headers = await _jwtHeaders();
+    final response = await GcpApiClient.get(_profilePath);
 
-    final req = Amplify.API.get(
-      _profilePath,
-      apiName: _apiName,
-      headers: headers,
-    );
-
-    final res = await req.response;
-    if (res.statusCode == 404) return null;
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Error get profile: ${res.statusCode} ${res.decodeBody()}');
+    if (response.statusCode == 404) return null;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Error getting profile: ${response.statusCode} ${response.body}');
     }
 
-    final data = json.decode(res.decodeBody()) as Map<String, dynamic>;
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
     return UserProfile.fromJson(data);
   }
 }

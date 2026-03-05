@@ -1,4 +1,4 @@
-import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'subscription_api.dart';
@@ -18,9 +18,12 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
 
   Future<void> _payWithMercadoPago() async {
     try {
-      // 1. Obtener el ID del usuario logueado en Amplify
-      final user = await Amplify.Auth.getCurrentUser();
-      final userId = user.userId;
+      // 1. Obtener el ID del usuario logueado en Firebase
+      final user = FirebaseAuth.instance.currentUser;
+      final userId = user?.uid;
+      if (userId == null) {
+        throw 'No hay sesión activa en Firebase';
+      }
 
       // 2. Tu link real de suscripción con el external_reference
       //test f99140fb1090406f9ab119279dab8a67

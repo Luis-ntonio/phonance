@@ -1,9 +1,9 @@
 
 // auth_gate.dart
 import 'package:flutter/material.dart';
-import 'package:amplify_flutter/amplify_flutter.dart';
-import 'auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'login_page.dart';
+import 'email_verification_page.dart';
 import '../subscription/subscription_gate.dart';
 import '../main.dart';
 
@@ -25,30 +25,29 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  late final Future<AuthSession> _authSessionFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _authSessionFuture = Amplify.Auth.fetchAuthSession();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AuthSession>(
-      future: _authSessionFuture,
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.userChanges(),
       builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
+        if (snap.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-        final signedIn = snap.hasData && (snap.data?.isSignedIn == true);
-        return signedIn
-            ? SubscriptionGate(
-                db: widget.db,
-                onDarkModeToggle: widget.onDarkModeToggle,
-                isDarkMode: widget.isDarkMode,
-              )
-            : LoginPage(
+        final user = snap.data;
+        final signedIn = user != null;
+        if (!signedIn) {
+          return LoginPage(
+            db: widget.db,
+            onDarkModeToggle: widget.onDarkModeToggle,
+            isDarkMode: widget.isDarkMode,
+          );
+        }
+
+        if (user!.emailVerified != true) {
+          return const EmailVerificationPage();
+        }
+
+        return SubscriptionGate(
                 db: widget.db,
                 onDarkModeToggle: widget.onDarkModeToggle,
                 isDarkMode: widget.isDarkMode,
