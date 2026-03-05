@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solicitud de eliminación de cuenta – Phonance</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f9fafb;
+      color: #1a202c;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #c53030;
+      color: #fff;
+      padding: 24px 32px;
+    }
+    header h1 { margin: 0; font-size: 1.6rem; }
+    header p  { margin: 6px 0 0; font-size: 0.9rem; opacity: 0.85; }
+    main {
+      max-width: 680px;
+      margin: 32px auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 40px 48px;
+      box-shadow: 0 1px 12px rgba(0,0,0,.07);
+    }
+    .notice {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+    .in-app-steps {
+      background: #e8f4fd;
+      border: 1px solid #90cdf4;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 32px;
+    }
+    .in-app-steps h3 { margin-top: 0; color: #2b6cb0; }
+    .in-app-steps ol { margin: 0; padding-left: 20px; }
+    .in-app-steps li { margin-bottom: 6px; line-height: 1.6; font-size: 0.95rem; }
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 28px 0;
+      color: #718096;
+      font-size: 0.85rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+    h2 { color: #c53030; font-size: 1.05rem; margin-top: 0; margin-bottom: 16px; }
+    label  { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; margin-top: 16px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #f7fafc;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #c53030;
+      background: #fff;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    .checkbox-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 20px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #4a5568;
+    }
+    .checkbox-row input[type=checkbox] { width: auto; margin-top: 2px; flex-shrink: 0; }
+    button[type=submit] {
+      display: block;
+      width: 100%;
+      margin-top: 24px;
+      padding: 13px;
+      background: #c53030;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    button[type=submit]:hover { background: #9b2c2c; }
+    .success-msg {
+      display: none;
+      background: #c6f6d5;
+      border: 1px solid #68d391;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-top: 20px;
+      color: #276749;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    a { color: #c53030; }
+    p { line-height: 1.75; font-size: 0.95rem; }
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.8rem;
+      color: #718096;
+    }
+    @media (max-width: 600px) {
+      main { margin: 16px; padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Eliminar cuenta</h1>
+  <p>Phonance – Solicitud de borrado de datos personales</p>
+</header>
+
+<main>
+  <div class="notice">
+    ⚠️ <strong>Esta acción es permanente e irreversible.</strong> Una vez procesada tu solicitud,
+    tu cuenta, historial de gastos y todos los datos asociados serán eliminados definitivamente.
+    Tendrás hasta <strong>30 días</strong> para cancelar tu solicitud escribiéndonos antes de que se ejecute el borrado.
+  </div>
+
+  <!-- Opción 1: desde la app -->
+  <div class="in-app-steps">
+    <h3>🚀 Opción más rápida: eliminar desde la app</h3>
+    <ol>
+      <li>Abre <strong>Phonance</strong> en tu dispositivo Android.</li>
+      <li>Ve a la pestaña <strong>Ajustes</strong> (ícono de engranaje, parte inferior derecha).</li>
+      <li>Desplázate hasta la sección <strong>Eliminar cuenta</strong> (botón rojo).</li>
+      <li>Confirma la acción. Tu cuenta se eliminará de inmediato.</li>
+    </ol>
+  </div>
+
+  <div class="divider">o usa el formulario si no tienes acceso a la app</div>
+
+  <!-- Opción 2: formulario web -->
+  <h2>Formulario de solicitud de eliminación</h2>
+  <p>
+    Completa el siguiente formulario y recibirás una confirmación por correo.
+    Procesaremos tu solicitud en un plazo máximo de <strong>30 días</strong>.
+  </p>
+
+  <!-- 
+    INSTRUCCIONES DE INTEGRACIÓN:
+    1. Crea una cuenta gratis en https://formspree.io
+    2. Crea un "New Form" con tu correo como destino
+    3. Reemplaza "YOUR_FORMSPREE_FORM_ID" en el action de abajo por tu ID real
+       Ejemplo: action="https://formspree.io/f/xabcdefg"
+  -->
+  <form id="deleteForm" action="https://formspree.io/f/xojkaqao" method="POST">
+    <input type="hidden" name="_subject" value="Solicitud eliminación de cuenta Phonance" />
+    <input type="hidden" name="_next" value="" />
+
+    <label for="email">Correo electrónico de la cuenta *</label>
+    <input
+      type="email"
+      id="email"
+      name="email"
+      required
+      placeholder="tucorreo@ejemplo.com"
+    />
+
+    <label for="reason">Motivo de la solicitud</label>
+    <select id="reason" name="reason">
+      <option value="">— Selecciona un motivo (opcional) —</option>
+      <option value="Ya no uso la aplicación">Ya no uso la aplicación</option>
+      <option value="Problemas con mi cuenta">Problemas con mi cuenta</option>
+      <option value="Preocupaciones de privacidad">Preocupaciones de privacidad</option>
+      <option value="Prefiero no decirlo">Prefiero no decirlo</option>
+      <option value="Otro">Otro</option>
+    </select>
+
+    <label for="message">Comentarios adicionales</label>
+    <textarea id="message" name="message" placeholder="Opcional..."></textarea>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="confirm" name="confirm" value="Sí, confirmo" required />
+      <label for="confirm" style="margin-top:0; font-weight:400;">
+        Entiendo que esta solicitud eliminará permanentemente mi cuenta y todos los datos asociados
+        (historial de gastos, perfil y configuración). Esta acción no puede deshacerse.
+      </label>
+    </div>
+
+    <button type="submit">Enviar solicitud de eliminación</button>
+  </form>
+
+  <div class="success-msg" id="successMsg">
+    ✅ <strong>Solicitud recibida.</strong> Te contactaremos al correo indicado para confirmar
+    el borrado. Si tienes dudas, escríbenos a
+    <a href="mailto:lagg1088@gmail.com">lagg1088@gmail.com</a>.
+  </div>
+
+  <p style="margin-top:32px; font-size:0.85rem; color:#718096;">
+    Para más información sobre cómo manejamos tus datos, consulta nuestra
+    <a href="/privacy-policy.html">Política de privacidad</a>.
+  </p>
+</main>
+
+<footer>
+  &copy; 2026 Phonance. Todos los derechos reservados.
+</footer>
+
+<script>
+  // Mostrar mensaje de éxito tras submit sin recargar la página
+  const form = document.getElementById('deleteForm');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    const res = await fetch(form.action, {
+      method: 'POST',
+      body: data,
+      headers: { 'Accept': 'application/json' }
+    });
+    if (res.ok) {
+      form.style.display = 'none';
+      document.getElementById('successMsg').style.display = 'block';
+    } else {
+      alert('Hubo un error al enviar la solicitud. Por favor intenta de nuevo o escríbenos directamente.');
+    }
+  });
+</script>
+
+</body>
+</html>
