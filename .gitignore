@@ -72,5 +72,5 @@ amplifytools.xcconfig
 
 
 .firebase*
-
+firebase_hosting/
 firebase.*
